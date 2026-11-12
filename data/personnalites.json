@@ -47,6 +47,29 @@
   "bio": "Élue Miss France 2013, elle a poursuivi ses études de médecine et exerce aujourd'hui comme médecin. Elle partage aussi des contenus santé avec une large communauté.",
   "lien": "Elle accompagne les contenus d'Initiatives-Cœur sur les réseaux sociaux.",
   "photos": [],
-  "rang": 847
+  "rang": 847,
+  "categorie": "Influenceuse"
+ },
+ {
+  "id": "constance-scharer",
+  "prenom": "Constance",
+  "nom": "Scharer",
+  "titre": "Influenceuse, créatrice de contenus",
+  "bio": "Bio à compléter (texte à faire valider par Constance).",
+  "lien": "Elle a accompagné Initiatives-Cœur sur la Route du Rhum 2026.",
+  "photos": [],
+  "categorie": "Influenceuse",
+  "rang": 640
+ },
+ {
+  "id": "nouchka",
+  "prenom": "Nouchka",
+  "nom": "",
+  "titre": "Nutritionniste, créatrice de contenus",
+  "bio": "Bio à compléter (texte à faire valider par Nouchka).",
+  "lien": "Elle partage avec Violette des contenus sur l'alimentation à bord.",
+  "photos": [],
+  "categorie": "Influenceuse",
+  "rang": 410
  }
 ]

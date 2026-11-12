@@ -100,7 +100,20 @@
    "retour": "2026-10-20",
    "statut": "rentree",
    "finance": 1.0,
-   "donateurs": 333
+   "donateurs": 333,
+   "lat": 12.639,
+   "lon": -8.003,
+   "photo": "enfants/551.jpg",
+   "photo_illustration": true,
+   "hop_lat": 47.218,
+   "hop_lon": -1.554,
+   "equipe": [
+    "local-551",
+    "cardio-nantes",
+    "chir-nantes",
+    "inf-nantes",
+    "accueil-551"
+   ]
   },
   {
    "num": 552,
@@ -118,7 +131,20 @@
    "retour": "2026-11-20",
    "statut": "convalescence",
    "finance": 1.0,
-   "donateurs": 374
+   "donateurs": 374,
+   "lat": 14.791,
+   "lon": -16.936,
+   "photo": "enfants/552.jpg",
+   "photo_illustration": true,
+   "hop_lat": 45.764,
+   "hop_lon": 4.836,
+   "equipe": [
+    "local-552",
+    "cardio-lyon",
+    "chir-lyon",
+    "anest-lyon",
+    "accueil-552"
+   ]
   },
   {
    "num": 553,
@@ -133,10 +159,23 @@
    "hopital": "Paris",
    "arrivee": "2026-11-03",
    "operation": "2026-11-24",
-   "retour": "",
+   "retour": "2026-12-22",
    "statut": "en-france",
    "finance": 1.0,
-   "donateurs": 377
+   "donateurs": 377,
+   "lat": -18.879,
+   "lon": 47.508,
+   "photo": "enfants/553.jpg",
+   "photo_illustration": true,
+   "hop_lat": 48.857,
+   "hop_lon": 2.352,
+   "equipe": [
+    "local-553",
+    "cardio-paris",
+    "chir-paris",
+    "inf-paris",
+    "accueil-553"
+   ]
   },
   {
    "num": 554,
@@ -150,11 +189,23 @@
    "accueil": "Bordeaux",
    "hopital": "Bordeaux",
    "arrivee": "2026-12-07",
-   "operation": "",
-   "retour": "",
+   "operation": "2026-12-15",
+   "retour": "2027-01-26",
    "statut": "arrivee-prevue",
    "finance": 1.0,
-   "donateurs": 392
+   "donateurs": 392,
+   "lat": 7.691,
+   "lon": -5.03,
+   "photo": "enfants/554.jpg",
+   "photo_illustration": true,
+   "hop_lat": 44.838,
+   "hop_lon": -0.579,
+   "equipe": [
+    "local-554",
+    "cardio-bordeaux",
+    "chir-bordeaux",
+    "accueil-554"
+   ]
   },
   {
    "num": 555,
@@ -167,12 +218,25 @@
    "simple": "Les deux grosses artères qui sortent du cœur sont inversées.",
    "accueil": "Toulouse",
    "hopital": "Toulouse",
-   "arrivee": "",
-   "operation": "",
-   "retour": "",
+   "arrivee": "2027-01-11",
+   "operation": "2027-01-20",
+   "retour": "2027-02-24",
    "statut": "dossier",
    "finance": 1.0,
-   "donateurs": 345
+   "donateurs": 345,
+   "lat": 18.594,
+   "lon": -72.307,
+   "photo": "enfants/555.jpg",
+   "photo_illustration": true,
+   "hop_lat": 43.605,
+   "hop_lon": 1.444,
+   "equipe": [
+    "local-555",
+    "cardio-toulouse",
+    "chir-toulouse",
+    "anest-toulouse",
+    "accueil-555"
+   ]
   },
   {
    "num": 556,
@@ -183,14 +247,26 @@
    "ville": "Bobo-Dioulasso",
    "patho": "Communication interauriculaire",
    "simple": "Un trou entre les deux oreillettes du cœur.",
-   "accueil": "",
-   "hopital": "",
-   "arrivee": "",
-   "operation": "",
-   "retour": "",
+   "accueil": "Rennes",
+   "hopital": "Rennes",
+   "arrivee": "2027-02-08",
+   "operation": "2027-02-17",
+   "retour": "2027-03-24",
    "statut": "dossier",
    "finance": 1.0,
-   "donateurs": 335
+   "donateurs": 335,
+   "lat": 11.177,
+   "lon": -4.298,
+   "photo": "enfants/556.jpg",
+   "photo_illustration": true,
+   "hop_lat": 48.117,
+   "hop_lon": -1.678,
+   "equipe": [
+    "local-556",
+    "cardio-rennes",
+    "chir-rennes",
+    "accueil-556"
+   ]
   },
   {
    "num": 557,
@@ -201,14 +277,26 @@
    "ville": "Conakry",
    "patho": "Persistance du canal artériel",
    "simple": "Un petit vaisseau qui aurait dû se fermer à la naissance est resté ouvert et fatigue son cœur.",
-   "accueil": "",
-   "hopital": "",
-   "arrivee": "",
-   "operation": "",
-   "retour": "",
+   "accueil": "Lille",
+   "hopital": "Lille",
+   "arrivee": "2027-03-08",
+   "operation": "2027-03-17",
+   "retour": "2027-04-21",
    "statut": "dossier",
    "finance": 1.0,
-   "donateurs": 399
+   "donateurs": 399,
+   "lat": 9.641,
+   "lon": -13.578,
+   "photo": "enfants/557.jpg",
+   "photo_illustration": true,
+   "hop_lat": 50.629,
+   "hop_lon": 3.057,
+   "equipe": [
+    "local-557",
+    "cardio-lille",
+    "chir-lille",
+    "accueil-557"
+   ]
   },
   {
    "num": 558,
@@ -219,14 +307,27 @@
    "ville": "Nouakchott",
    "patho": "Sténose de la valve pulmonaire",
    "simple": "La valve qui laisse passer le sang vers les poumons est trop étroite.",
-   "accueil": "",
-   "hopital": "",
-   "arrivee": "",
-   "operation": "",
-   "retour": "",
+   "accueil": "Marseille",
+   "hopital": "Marseille",
+   "arrivee": "2027-04-12",
+   "operation": "2027-04-21",
+   "retour": "2027-05-26",
    "statut": "financement",
    "finance": 0.082,
-   "donateurs": 45
+   "donateurs": 45,
+   "lat": 18.074,
+   "lon": -15.958,
+   "photo": "enfants/558.jpg",
+   "photo_illustration": true,
+   "hop_lat": 43.297,
+   "hop_lon": 5.37,
+   "equipe": [
+    "local-558",
+    "cardio-marseille",
+    "chir-marseille",
+    "inf-marseille",
+    "accueil-558"
+   ]
   }
  ],
  "collecte": 84985,

@@ -7,8 +7,7 @@
    "accroche": "Votre nom embarque",
    "items": [
     "Votre prénom et votre nom sur le mât (place attribuée automatiquement)",
-    "Votre page personnelle à partager",
-    "Votre message sur le mur des donateurs (après validation)",
+    "Votre fiche à partager et votre message sur le mur des donateurs",
     "1 participation au tirage au sort"
    ]
   },
@@ -19,17 +18,19 @@
    "accroche": "Vous choisissez votre place",
    "items": [
     "Tout le palier Mousse",
-    "Vous choisissez votre place sur le mât, comme un siège d'avion"
+    "Vous choisissez votre place sur le mât, comme un siège d'avion",
+    "Un fond d'écran « Mon nom est sur le mât »"
    ]
   },
   {
    "id": "equipier",
    "min": 30,
    "nom": "Équipier",
-   "accroche": "Un souvenir à garder",
+   "accroche": "Une photo dédicacée",
    "items": [
     "Tout le palier Matelot",
-    "Un fond d'écran « Mon nom est sur le mât » avec votre nom",
+    "Votre nom peut aller dans le cockpit, sous les yeux de Violette",
+    "Une photo dédicacée par Violette Dorange",
     "3 participations au tirage au sort"
    ]
   },
@@ -37,10 +38,11 @@
    "id": "barreur",
    "min": 60,
    "nom": "Barreur",
-   "accroche": "Un mot de Violette",
+   "accroche": "Un mot rien que pour vous",
    "items": [
     "Tout le palier Équipier",
-    "Une carte postale dédicacée par Violette Dorange, envoyée chez vous",
+    "Un poster dédicacé par Violette Dorange",
+    "Un mot personnalisé écrit par Violette",
     "6 participations au tirage au sort"
    ]
   },
@@ -51,18 +53,20 @@
    "accroche": "Montez à bord",
    "items": [
     "Tout le palier Barreur",
-    "Une invitation à la visite du bateau au ponton à Lorient (dates proposées par l'équipe)",
+    "Un livre de Violette Dorange dédicacé",
+    "Un t-shirt Initiatives-Cœur dédicacé",
+    "Une invitation à visiter le bateau au ponton à Lorient",
     "15 participations au tirage au sort"
    ]
   }
  ],
  "tirage": {
-  "titre": "Grand tirage au sort",
+  "titre": "Grand tirage au sort parmi tous les donateurs",
   "date": "à l'issue de la campagne",
   "lots": [
    {
-    "nom": "Une navigation à bord d'Initiatives-Cœur avec Violette Dorange",
-    "nb": 1
+    "nom": "Une navigation à bord d'Initiatives-Cœur en compagnie de Violette Dorange",
+    "nb": 5
    },
    {
     "nom": "Une visite technique du bateau avec l'équipe à Lorient",
@@ -73,7 +77,8 @@
     "nb": 10
    }
   ],
-  "regle": "Une participation par tranche de 10 € donnés (voir les paliers).",
-  "mentions": "Règlement complet à venir. Tirage soumis à la réglementation des loteries (autorisation préalable à demander) — à valider avant ouverture."
+  "regle": "Tous les donateurs participent automatiquement, dès 10 €. Une participation par tranche de 10 € donnés (voir les paliers).",
+  "mentions": "Règlement complet à venir. Tirage soumis à la réglementation des loteries (autorisation préalable à demander) — à valider avant ouverture.",
+  "accroche": "5 donateurs tirés au sort embarqueront pour une navigation avec Violette Dorange"
  }
 }
