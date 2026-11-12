@@ -1,0 +1,17 @@
+{
+ "mode": "prototype",
+ "prix_auto": 10,
+ "prix_choix": 15,
+ "montants": [
+  10,
+  15,
+  30,
+  60,
+  150
+ ],
+ "don_url": "",
+ "message_max": 200,
+ "afficher_palier": true,
+ "reservation_minutes": 30,
+ "boutique_url": "https://www.initiatives-coeur.fr"
+}

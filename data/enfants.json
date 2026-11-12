@@ -1,0 +1,234 @@
+{
+ "cout": 12000,
+ "anterieurs": 550,
+ "histo": {
+  "466": [
+   "Mali",
+   92
+  ],
+  "686": [
+   "Sénégal",
+   71
+  ],
+  "384": [
+   "Côte d'Ivoire",
+   58
+  ],
+  "854": [
+   "Burkina Faso",
+   44
+  ],
+  "324": [
+   "Guinée",
+   39
+  ],
+  "450": [
+   "Madagascar",
+   47
+  ],
+  "120": [
+   "Cameroun",
+   31
+  ],
+  "204": [
+   "Bénin",
+   26
+  ],
+  "768": [
+   "Togo",
+   22
+  ],
+  "478": [
+   "Mauritanie",
+   18
+  ],
+  "562": [
+   "Niger",
+   14
+  ],
+  "148": [
+   "Tchad",
+   12
+  ],
+  "180": [
+   "RD Congo",
+   17
+  ],
+  "332": [
+   "Haïti",
+   21
+  ],
+  "422": [
+   "Liban",
+   9
+  ],
+  "051": [
+   "Arménie",
+   6
+  ],
+  "368": [
+   "Irak",
+   8
+  ],
+  "004": [
+   "Afghanistan",
+   5
+  ],
+  "116": [
+   "Cambodge",
+   4
+  ],
+  "262": [
+   "Djibouti",
+   6
+  ]
+ },
+ "enfants": [
+  {
+   "num": 551,
+   "prenom": "Aminata",
+   "age": 4,
+   "pays": "Mali",
+   "iso": "466",
+   "ville": "Bamako",
+   "patho": "Communication interventriculaire",
+   "simple": "Un trou entre les deux ventricules du cœur, qui l'empêchait de grandir et de respirer normalement.",
+   "accueil": "Nantes",
+   "hopital": "Nantes",
+   "arrivee": "2026-09-08",
+   "operation": "2026-09-17",
+   "retour": "2026-10-20",
+   "statut": "rentree",
+   "finance": 1.0,
+   "donateurs": 333
+  },
+  {
+   "num": 552,
+   "prenom": "Moussa",
+   "age": 7,
+   "pays": "Sénégal",
+   "iso": "686",
+   "ville": "Thiès",
+   "patho": "Tétralogie de Fallot",
+   "simple": "Une malformation qui associe quatre anomalies du cœur ; le sang manquait d'oxygène, ses lèvres devenaient bleues à l'effort.",
+   "accueil": "Lyon",
+   "hopital": "Lyon",
+   "arrivee": "2026-09-29",
+   "operation": "2026-10-09",
+   "retour": "2026-11-20",
+   "statut": "convalescence",
+   "finance": 1.0,
+   "donateurs": 374
+  },
+  {
+   "num": 553,
+   "prenom": "Fanja",
+   "age": 2,
+   "pays": "Madagascar",
+   "iso": "450",
+   "ville": "Antananarivo",
+   "patho": "Canal atrio-ventriculaire",
+   "simple": "Les cloisons au centre du cœur ne se sont pas formées ; son cœur s'épuisait.",
+   "accueil": "Paris",
+   "hopital": "Paris",
+   "arrivee": "2026-11-03",
+   "operation": "2026-11-24",
+   "retour": "",
+   "statut": "en-france",
+   "finance": 1.0,
+   "donateurs": 377
+  },
+  {
+   "num": 554,
+   "prenom": "Kouassi",
+   "age": 9,
+   "pays": "Côte d'Ivoire",
+   "iso": "384",
+   "ville": "Bouaké",
+   "patho": "Rétrécissement de la valve mitrale",
+   "simple": "Une valve du cœur abîmée par un rhumatisme, qui ne s'ouvrait plus assez.",
+   "accueil": "Bordeaux",
+   "hopital": "Bordeaux",
+   "arrivee": "2026-12-07",
+   "operation": "",
+   "retour": "",
+   "statut": "arrivee-prevue",
+   "finance": 1.0,
+   "donateurs": 392
+  },
+  {
+   "num": 555,
+   "prenom": "Stevenson",
+   "age": 5,
+   "pays": "Haïti",
+   "iso": "332",
+   "ville": "Port-au-Prince",
+   "patho": "Transposition des gros vaisseaux",
+   "simple": "Les deux grosses artères qui sortent du cœur sont inversées.",
+   "accueil": "Toulouse",
+   "hopital": "Toulouse",
+   "arrivee": "",
+   "operation": "",
+   "retour": "",
+   "statut": "dossier",
+   "finance": 1.0,
+   "donateurs": 345
+  },
+  {
+   "num": 556,
+   "prenom": "Mariam",
+   "age": 6,
+   "pays": "Burkina Faso",
+   "iso": "854",
+   "ville": "Bobo-Dioulasso",
+   "patho": "Communication interauriculaire",
+   "simple": "Un trou entre les deux oreillettes du cœur.",
+   "accueil": "",
+   "hopital": "",
+   "arrivee": "",
+   "operation": "",
+   "retour": "",
+   "statut": "dossier",
+   "finance": 1.0,
+   "donateurs": 335
+  },
+  {
+   "num": 557,
+   "prenom": "Hawa",
+   "age": 3,
+   "pays": "Guinée",
+   "iso": "324",
+   "ville": "Conakry",
+   "patho": "Persistance du canal artériel",
+   "simple": "Un petit vaisseau qui aurait dû se fermer à la naissance est resté ouvert et fatigue son cœur.",
+   "accueil": "",
+   "hopital": "",
+   "arrivee": "",
+   "operation": "",
+   "retour": "",
+   "statut": "dossier",
+   "finance": 1.0,
+   "donateurs": 399
+  },
+  {
+   "num": 558,
+   "prenom": "Yacine",
+   "age": 8,
+   "pays": "Mauritanie",
+   "iso": "478",
+   "ville": "Nouakchott",
+   "patho": "Sténose de la valve pulmonaire",
+   "simple": "La valve qui laisse passer le sang vers les poumons est trop étroite.",
+   "accueil": "",
+   "hopital": "",
+   "arrivee": "",
+   "operation": "",
+   "retour": "",
+   "statut": "financement",
+   "finance": 0.082,
+   "donateurs": 45
+  }
+ ],
+ "collecte": 84985,
+ "note": "Fiches et répartition FICTIVES pour la démonstration : les vraies fiches seront fournies par Mécénat Chirurgie Cardiaque, avec l'accord des familles."
+}

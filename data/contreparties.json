@@ -1,0 +1,79 @@
+{
+ "paliers": [
+  {
+   "id": "mousse",
+   "min": 10,
+   "nom": "Mousse",
+   "accroche": "Votre nom embarque",
+   "items": [
+    "Votre prénom et votre nom sur le mât (place attribuée automatiquement)",
+    "Votre page personnelle à partager",
+    "Votre message sur le mur des donateurs (après validation)",
+    "1 participation au tirage au sort"
+   ]
+  },
+  {
+   "id": "matelot",
+   "min": 15,
+   "nom": "Matelot",
+   "accroche": "Vous choisissez votre place",
+   "items": [
+    "Tout le palier Mousse",
+    "Vous choisissez votre place sur le mât, comme un siège d'avion"
+   ]
+  },
+  {
+   "id": "equipier",
+   "min": 30,
+   "nom": "Équipier",
+   "accroche": "Un souvenir à garder",
+   "items": [
+    "Tout le palier Matelot",
+    "Un fond d'écran « Mon nom est sur le mât » avec votre nom",
+    "3 participations au tirage au sort"
+   ]
+  },
+  {
+   "id": "barreur",
+   "min": 60,
+   "nom": "Barreur",
+   "accroche": "Un mot de Violette",
+   "items": [
+    "Tout le palier Équipier",
+    "Une carte postale dédicacée par Violette Dorange, envoyée chez vous",
+    "6 participations au tirage au sort"
+   ]
+  },
+  {
+   "id": "skipper",
+   "min": 150,
+   "nom": "Skipper",
+   "accroche": "Montez à bord",
+   "items": [
+    "Tout le palier Barreur",
+    "Une invitation à la visite du bateau au ponton à Lorient (dates proposées par l'équipe)",
+    "15 participations au tirage au sort"
+   ]
+  }
+ ],
+ "tirage": {
+  "titre": "Grand tirage au sort",
+  "date": "à l'issue de la campagne",
+  "lots": [
+   {
+    "nom": "Une navigation à bord d'Initiatives-Cœur avec Violette Dorange",
+    "nb": 1
+   },
+   {
+    "nom": "Une visite technique du bateau avec l'équipe à Lorient",
+    "nb": 3
+   },
+   {
+    "nom": "Des objets dédicacés par Violette Dorange",
+    "nb": 10
+   }
+  ],
+  "regle": "Une participation par tranche de 10 € donnés (voir les paliers).",
+  "mentions": "Règlement complet à venir. Tirage soumis à la réglementation des loteries (autorisation préalable à demander) — à valider avant ouverture."
+ }
+}

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Le mât en fun facts · Initiatives-Cœur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root { --abysse: #071629; --houle: #0f2742; --ecume: #f4f1ea; --brume: #9fb3c9; --coeur: #e5202e; --ciel: #8fd0ff; --vert: #5fd39a;
+  --display: "Big Shoulders Display", "Arial Narrow", sans-serif; --body: "Atkinson Hyperlegible", system-ui, sans-serif; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--abysse); color: var(--ecume); font: 17px/1.55 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: var(--ciel); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 60px; }
+nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font: 800 15px/1 var(--display); letter-spacing: .16em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
+.brand svg { width: 18px; height: 18px; fill: var(--coeur); }
+.cta { display: inline-flex; align-items: center; gap: 8px; background: var(--coeur); color: #fff; text-decoration: none; padding: 12px 18px; border-radius: 12px;
+  font: 800 18px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; }
+.cta.ghost { background: transparent; border: 2px solid rgba(244,241,234,.6); }
+header.hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: end; padding: 40px 0 24px; }
+h1 { margin: 0; font: 900 clamp(56px, 9vw, 132px)/.84 var(--display); text-transform: uppercase; }
+h1 em { font-style: normal; color: var(--coeur); }
+.lead { color: var(--brume); font-size: 19px; max-width: 46ch; margin: 18px 0 0; }
+.big { font: 900 clamp(120px, 18vw, 240px)/.8 var(--display); color: var(--ecume); text-align: right; letter-spacing: -.02em; }
+.big small { font-size: .3em; color: var(--brume); letter-spacing: .02em; }
+.scale { display: grid; grid-template-columns: 1fr 1.2fr; gap: 40px; margin: 30px 0 50px; align-items: start; }
+.scale svg { width: 100%; height: auto; display: block; }
+.scale .note { color: var(--brume); font-size: 15px; }
+h2 { font: 900 clamp(36px, 4.4vw, 56px)/.9 var(--display); text-transform: uppercase; margin: 0 0 18px; }
+h2 em { font-style: normal; color: var(--coeur); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.card { background: var(--houle); border-radius: 18px; padding: 18px 18px 16px; display: grid; gap: 6px; align-content: start; position: relative; overflow: hidden; }
+.card b { font: 900 54px/.9 var(--display); color: var(--ecume); font-variant-numeric: tabular-nums; }
+.card b u { text-decoration: none; font-size: .45em; color: var(--brume); margin-left: 4px; }
+.card h3 { margin: 0; font: 800 20px/1.1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--ciel); }
+.card p { margin: 0; color: var(--brume); font-size: 15px; }
+.card .src { font-size: 12px; opacity: .8; }
+.card.red { background: linear-gradient(160deg, #a50f1b, #5d0a13); }
+.card.red h3, .card.red p { color: #ffd9dc; }
+.quiz { margin: 50px 0; display: grid; gap: 14px; }
+.q { background: var(--houle); border-radius: 18px; padding: 16px 18px; display: grid; gap: 10px; }
+.q > b { font: 800 22px/1.15 var(--display); letter-spacing: .02em; }
+.q .opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.q button { border: 1px solid rgba(159,179,201,.4); background: transparent; color: var(--ecume); border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 15px; cursor: pointer; }
+.q button.ok { background: var(--vert); border-color: var(--vert); color: var(--abysse); font-weight: 700; }
+.q button.ko { background: rgba(229,32,46,.25); border-color: var(--coeur); }
+.q .why { display: none; color: var(--brume); font-size: 15px; margin: 0; }
+.q.done .why { display: block; }
+footer { border-top: 1px solid rgba(159,179,201,.2); padding-top: 18px; margin-top: 40px; color: var(--brume); font-size: 13px; display: grid; gap: 6px; }
+@media (max-width: 860px) {
+  header.hero, .scale { grid-template-columns: 1fr; gap: 16px; }
+  .big { text-align: left; }
+  .wrap { padding: 18px 16px 40px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="brand"><svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg>Initiatives-Cœur</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="cta ghost" href="index.html">Voir le mât en 3D</a><a class="cta" href="index.html#don">Mettre mon nom ↑</a></div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <h1>Le mât en <em>fun facts.</em></h1>
+      <p class="lead">Un tube de carbone haut comme un immeuble de dix étages, posé sur un bateau de 18 mètres, et bientôt couvert de milliers de noms. Tout ce qu'il faut savoir sur le mât d'un IMOCA, et sur celui d'Initiatives-Cœur.</p>
+    </div>
+    <div class="big">29<small> m</small></div>
+  </header>
+
+  <section class="scale">
+    <svg viewBox="0 0 420 640" role="img" aria-label="Le mât à l'échelle, comparé à une personne, une girafe et un immeuble de dix étages">
+      <defs><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d5d8c"/><stop offset="1" stop-color="#0b2440"/></linearGradient></defs>
+      <rect x="0" y="600" width="420" height="40" fill="url(#sea)"/>
+      <g font-family="Big Shoulders Display, Arial Narrow, sans-serif" font-weight="800" font-size="15" fill="#9fb3c9">
+        <!-- règle : 20 px par mètre, pont à y=600 -->
+        <g stroke="#9fb3c9" stroke-width="1">
+          <line x1="40" y1="20" x2="40" y2="600"/>
+          <line x1="32" y1="600" x2="40" y2="600"/><line x1="32" y1="500" x2="40" y2="500"/><line x1="32" y1="400" x2="40" y2="400"/>
+          <line x1="32" y1="300" x2="40" y2="300"/><line x1="32" y1="200" x2="40" y2="200"/><line x1="32" y1="100" x2="40" y2="100"/><line x1="32" y1="20" x2="40" y2="20"/>
+        </g>
+        <text x="28" y="604" text-anchor="end">0</text><text x="28" y="504" text-anchor="end">5</text><text x="28" y="404" text-anchor="end">10</text>
+        <text x="28" y="304" text-anchor="end">15</text><text x="28" y="204" text-anchor="end">20</text><text x="28" y="104" text-anchor="end">25</text><text x="28" y="24" text-anchor="end">29 m</text>
+      </g>
+      <!-- immeuble de 10 étages (30 m) -->
+      <g transform="translate(70,0)"><rect x="0" y="0" width="70" height="600" fill="#15314f" stroke="#2b4d72"/>
+        <g fill="#8fd0ff" opacity=".35">
+          <rect x="10" y="20" width="14" height="22"/><rect x="46" y="20" width="14" height="22"/><rect x="10" y="80" width="14" height="22"/><rect x="46" y="80" width="14" height="22"/>
+          <rect x="10" y="140" width="14" height="22"/><rect x="46" y="140" width="14" height="22"/><rect x="10" y="200" width="14" height="22"/><rect x="46" y="200" width="14" height="22"/>
+          <rect x="10" y="260" width="14" height="22"/><rect x="46" y="260" width="14" height="22"/><rect x="10" y="320" width="14" height="22"/><rect x="46" y="320" width="14" height="22"/>
+          <rect x="10" y="380" width="14" height="22"/><rect x="46" y="380" width="14" height="22"/><rect x="10" y="440" width="14" height="22"/><rect x="46" y="440" width="14" height="22"/>
+          <rect x="10" y="500" width="14" height="22"/><rect x="46" y="500" width="14" height="22"/><rect x="10" y="560" width="14" height="22"/><rect x="46" y="560" width="14" height="22"/></g>
+        <text x="35" y="-6" text-anchor="middle" font-family="Big Shoulders Display, Arial Narrow" font-weight="800" font-size="14" fill="#9fb3c9">10 ÉTAGES</text></g>
+      <!-- le mât : légèrement incliné (quête), bandes de noms -->
+      <g transform="rotate(-6 230 600)">
+        <rect x="222" y="20" width="16" height="580" rx="6" fill="#f2f4f6"/>
+        <rect x="223" y="208" width="14" height="260" fill="#fff"/><rect x="223" y="54" width="14" height="246" fill="#fff"/>
+        <g fill="#13294b" opacity=".55">
+          <rect x="225" y="214" width="10" height="250"/><rect x="225" y="60" width="10" height="236"/>
+        </g>
+        <rect x="223" y="300" width="14" height="4" fill="#ce111e"/><rect x="223" y="464" width="14" height="4" fill="#ce111e"/><rect x="223" y="204" width="14" height="4" fill="#ce111e"/><rect x="223" y="50" width="14" height="4" fill="#ce111e"/>
+        <rect x="220" y="305" width="20" height="5" fill="#15171a"/>
+        <line x1="236" y1="14" x2="236" y2="-2" stroke="#15171a" stroke-width="2"/><circle cx="236" cy="-3" r="3" fill="#15171a"/>
+      </g>
+      <!-- coque -->
+      <path d="M150 600 L400 600 L388 616 L170 616 Z" fill="#ce111e"/>
+      <!-- girafe (5,5 m) -->
+      <g transform="translate(300,490)" fill="#f2c14e"><rect x="0" y="40" width="34" height="22" rx="8"/><rect x="24" y="0" width="7" height="48"/><rect x="22" y="-8" width="16" height="10" rx="4"/>
+        <rect x="3" y="60" width="4" height="50"/><rect x="27" y="60" width="4" height="50"/></g>
+      <text x="317" y="476" text-anchor="middle" font-family="Big Shoulders Display, Arial Narrow" font-weight="800" font-size="14" fill="#f2c14e">GIRAFE 5,5 M</text>
+      <!-- personne (1,8 m) -->
+      <g transform="translate(372,564)" fill="#8fd0ff"><circle cx="5" cy="4" r="4"/><rect x="1" y="9" width="8" height="15" rx="3"/><rect x="1" y="22" width="3" height="14"/><rect x="6" y="22" width="3" height="14"/></g>
+      <text x="377" y="556" text-anchor="middle" font-family="Big Shoulders Display, Arial Narrow" font-weight="800" font-size="13" fill="#8fd0ff">1,80 M</text>
+      <!-- repères -->
+      <g font-family="Atkinson Hyperlegible, sans-serif" font-size="11" fill="#f4f1ea">
+        <line x1="250" y1="305" x2="268" y2="300" stroke="#e5202e"/><text x="272" y="296">Ferrures des haubans</text><text x="272" y="311" fill="#9fb3c9">14,7 m</text>
+        <line x1="246" y1="56" x2="268" y2="70" stroke="#e5202e"/><text x="272" y="66">Dernière rangée de noms</text><text x="272" y="81" fill="#9fb3c9">27,3 m</text>
+        <line x1="250" y1="12" x2="268" y2="20" stroke="#e5202e"/><text x="272" y="18">Anémomètre, VHF, feu</text>
+      </g>
+    </svg>
+    <div>
+      <h2>Plus haut qu'un <em>immeuble de 10 étages</em></h2>
+      <p class="note">La classe IMOCA limite le tirant d'air à 29 m : c'est la hauteur maximale du haut du mât au-dessus de l'eau, bateau au repos. Le mât lui-même mesure autour de 28,5 m. À cette échelle, une personne tient dans un seul étage, une girafe dans deux.</p>
+      <p class="note">Les noms des donateurs occupent deux grandes zones de chaque côté du mât, de 1,3 m à 27,3 m, interrompues à 14,7 m par les ferrures où s'accrochent les haubans.</p>
+      <p class="note"><a href="index.html">Explorer le mât en 3D →</a></p>
+    </div>
+  </section>
+
+  <h2>Le mât <em>en chiffres</em></h2>
+  <div class="cards">
+    <div class="card"><h3>Tirant d'air</h3><b>29<u>m</u></b><p>Hauteur maximale autorisée par la jauge IMOCA, mesurée depuis l'eau.</p><span class="src">Source : règles de la classe IMOCA</span></div>
+    <div class="card"><h3>La quête</h3><b>2 à 6<u>°</u></b><p>Le mât n'est pas droit : il penche vers l'arrière. Sur le modèle 3D d'Initiatives-Cœur, environ 6°.</p><span class="src">Source : classe IMOCA</span></div>
+    <div class="card"><h3>Monotype</h3><b>2013</b><p>Depuis cette année-là, tous les nouveaux IMOCA ont le même mât (et la même quille) : plus fiable, moins cher.</p><span class="src">Source : décision de la classe IMOCA, avril 2013</span></div>
+    <div class="card"><h3>Poids</h3><b>240<u>kg</u></b><p>Le poids d'un mât monotype de 28,5 m en 2016 : à peine trois adultes. La nouvelle génération est un peu plus lourde.</p><span class="src">Source : IMOCA, 2016</span></div>
+    <div class="card"><h3>Made in Lorient</h3><b>1<u>seule pièce</u></b><p>Lorima moule le mât d'un seul tenant et le cuit une seule fois, dans l'ancienne base de sous-marins de Lorient.</p><span class="src">Source : IMOCA / Lorima</span></div>
+    <div class="card"><h3>Contrôle qualité</h3><b>100<u>%</u></b><p>Chaque mât passe aux ultrasons et subit des tests de rigidité avant d'embarquer.</p><span class="src">Source : Lorima</span></div>
+    <div class="card"><h3>Un mât-aile</h3><b>51<u>cm</u></b><p>Profil en forme d'aile : environ 51 cm de corde au pied, 38 cm en tête, pour 28 cm d'épaisseur.</p><span class="src">Mesures du modèle 3D d'Initiatives-Cœur</span></div>
+    <div class="card"><h3>L'horizon</h3><b>19<u>km</u></b><p>Depuis le sommet du mât, on voit la mer jusqu'à environ 19 km par temps clair (contre 5 km depuis le pont).</p><span class="src">Calcul : 3,57 × √hauteur</span></div>
+    <div class="card"><h3>Un mât de secours</h3><b>1</b><p>La classe garde un mât de rechange chez Lorima, prêt à partir si un bateau démâte avant une grande course.</p><span class="src">Source : classe IMOCA</span></div>
+  </div>
+
+  <h2 style="margin-top:50px">Les noms <em>sur le mât</em></h2>
+  <div class="cards">
+    <div class="card red"><h3>Places</h3><b id="nSlots">6 804</b><p>2 flancs × 3 colonnes × 1 134 rangées, comme les sièges d'un avion.</p></div>
+    <div class="card red"><h3>Une rangée</h3><b>2,2<u>cm</u></b><p>Des lettres d'environ 1 cm, lisibles de près. Chaque nom tient sur une case de 9 à 12 cm de large.</p></div>
+    <div class="card red"><h3>Le vinyle</h3><b>≈ 15<u>m²</u></b><p>La surface totale de toutes les cases : l'équivalent d'une chambre, en autocollants.</p></div>
+    <div class="card red"><h3>Tout en haut</h3><b>27,3<u>m</u></b><p>La plus haute rangée de noms, juste sous les instruments. Sophie Adenot y est, au plus près des étoiles.</p></div>
+    <div class="card red"><h3>Un enfant</h3><b>12 000<u>€</u></b><p>Le coût moyen pour qu'un enfant soit opéré du cœur par Mécénat Chirurgie Cardiaque : 1 200 noms à 10 €.</p><span class="src" style="color:#ffd9dc">Source : Mécénat Chirurgie Cardiaque</span></div>
+    <div class="card red"><h3>Le tour du monde</h3><b>≈ 45 000<u>km</u></b><p>La distance que parcourent les noms sur un Vendée Globe, sans escale.</p></div>
+  </div>
+
+  <section class="quiz" id="quiz">
+    <h2>Petit <em>quiz</em></h2>
+  </section>
+
+  <footer>
+    <div><b>Sources :</b> classe IMOCA (jauge, mât monotype, mât de secours), Lorima, IMOCA « Lorima accompanying the sailors in the Vendée Globe » (2016), Mécénat Chirurgie Cardiaque. Profil et inclinaison mesurés sur le modèle 3D de la visite virtuelle d'Initiatives-Cœur.</div>
+    <div>Prototype de démonstration : les chiffres sur les noms (places, rangées) correspondent au plan proposé et seront ajustés avec l'équipe technique.</div>
+  </footer>
+</div>
+<script>
+const Q = [
+  ["Quelle hauteur maximale le haut du mât d'un IMOCA peut-il atteindre au-dessus de l'eau ?", ["23 m", "29 m", "35 m"], 1, "29 m : c'est le tirant d'air maximum fixé par la classe IMOCA."],
+  ["Comment les marins appellent-ils l'inclinaison du mât vers l'arrière ?", ["La quête", "La gîte", "Le tangage"], 0, "La quête. La gîte, c'est quand tout le bateau penche sur le côté."],
+  ["Où sont fabriqués les mâts monotypes des IMOCA ?", ["À Brest", "À Lorient", "À La Rochelle"], 1, "À Lorient, par Lorima, dans l'ancienne base de sous-marins."],
+  ["Combien coûte en moyenne l'opération d'un enfant par Mécénat Chirurgie Cardiaque ?", ["1 200 €", "12 000 €", "120 000 €"], 1, "12 000 € : voyage, opération et séjour en France compris."],
+];
+const box = document.getElementById("quiz");
+Q.forEach(([q, opts, ok, why]) => {
+  const d = document.createElement("div"); d.className = "q";
+  d.innerHTML = `<b>${q}</b><div class="opts">${opts.map((o, i) => `<button type="button" data-i="${i}">${o}</button>`).join("")}</div><p class="why">${why}</p>`;
+  d.querySelectorAll("button").forEach(b => b.onclick = () => { d.classList.add("done"); d.querySelectorAll("button").forEach(x => x.classList.toggle("ok", +x.dataset.i === ok)); if (+b.dataset.i !== ok) b.classList.add("ko"); });
+  box.appendChild(d);
+});
+</script>
+</body>
+</html>

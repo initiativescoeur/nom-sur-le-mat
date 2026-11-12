@@ -3,575 +3,144 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Votre nom sur le mât</title>
+<title>Votre nom sur le mât · Initiatives-Cœur</title>
+<meta name="description" content="Embarquez votre nom sur le mât de l'IMOCA Initiatives-Cœur et aidez Mécénat Chirurgie Cardiaque à sauver des enfants.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<style>
-:root {
-  /* Un seul univers : la nuit marine autour d'un mât blanc ; la scène vidéo à gauche, le récit à droite (empilés sur mobile). */
-  --abysse: #071629;
-  --houle: #0f2742;
-  --ecume: #f4f1ea;
-  --brume: #9fb3c9;
-  --coeur: #e5202e;
-  --ciel: #8fd0ff;
-  --display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", sans-serif;
-  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
-  color-scheme: dark;
-}
-* { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
-body { background: var(--abysse); color: var(--ecume); font: 17px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
-button, input { font: inherit; color: inherit; }
-:focus-visible { outline: 3px solid var(--ciel); outline-offset: 2px; }
-
-.app { height: 100%; display: grid; grid-template-columns: auto minmax(340px, 460px); gap: clamp(24px, 4vw, 64px);
-  align-items: center; justify-content: center; padding: 24px; }
-
-/* ---------- scène vidéo ---------- */
-.stage { position: relative; height: calc(100vh - 48px); height: calc(100dvh - 48px); max-height: 1280px; aspect-ratio: 9 / 16;
-  border-radius: 22px; overflow: hidden; background: #0b2440; box-shadow: 0 30px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06); }
-.cam { position: absolute; inset: 0; transition: transform .7s cubic-bezier(.2,.8,.2,1); }
-.stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: filter .25s ease, transform .25s ease; }
-.stage.jump video { filter: blur(10px) brightness(1.15) saturate(1.2); transform: scaleY(1.08); }
-.veil { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(7,22,41,.55) 0, rgba(7,22,41,0) 18%, rgba(7,22,41,0) 70%, rgba(7,22,41,.35) 100%); }
-
-.tag { position: absolute; top: 16px; left: 16px; display: flex; align-items: center; gap: 8px; font: 800 15px/1 var(--display);
-  letter-spacing: .14em; text-transform: uppercase; color: #fff; text-shadow: 0 1px 8px rgba(0,0,0,.4); }
-.tag svg { width: 18px; height: 18px; fill: var(--coeur); }
-.sound { position: absolute; top: 10px; right: 10px; width: 44px; height: 44px; border-radius: 50%; border: 0;
-  background: rgba(7,22,41,.55); backdrop-filter: blur(6px); cursor: pointer; display: grid; place-items: center; }
-.sound svg { width: 22px; height: 22px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; }
-.sound[aria-pressed="false"] .on, .sound[aria-pressed="true"] .off { display: none; }
-
-/* altimètre : hauteur de la caméra au-dessus du pont */
-.alti { position: absolute; right: 12px; top: 76px; bottom: 28px; width: 64px; pointer-events: none; }
-.alti .rail { position: absolute; right: 0; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,.55); }
-.alti .tick { position: absolute; right: 0; height: 1px; width: 8px; background: rgba(255,255,255,.6); }
-.alti .tick.big { width: 16px; background: #fff; }
-.alti .lab { position: absolute; right: 22px; transform: translateY(50%); font: 800 14px/1 var(--display); color: #fff;
-  text-shadow: 0 1px 6px rgba(0,0,0,.6); font-variant-numeric: tabular-nums; }
-.alti .cur { position: absolute; right: -2px; transform: translateY(50%); display: flex; align-items: center; gap: 6px;
-  transition: bottom .35s ease; }
-.alti .cur b { font: 900 16px/1 var(--display); background: #fff; color: var(--abysse); padding: 4px 6px; border-radius: 6px;
-  font-variant-numeric: tabular-nums; white-space: nowrap; }
-.alti .cur i { width: 0; height: 0; border: 7px solid transparent; border-right-color: #fff; border-left: 0; }
-.alti .target { position: absolute; right: -9px; transform: translateY(50%); width: 20px; height: 20px; display: none; }
-.alti .target svg { width: 20px; height: 20px; fill: var(--coeur); filter: drop-shadow(0 0 6px rgba(229,32,46,.9)); }
-.alti.armed .target { display: block; }
-.stage.travel .alti .cur { transition: none; }
-
-/* surlignage du nom */
-.spot { position: absolute; display: none; border-radius: 12px; border: 3px solid var(--coeur);
-  box-shadow: 0 0 0 200vmax rgba(4,12,24,.55), 0 0 24px 4px rgba(229,32,46,.65); pointer-events: none; }
-.spot.show { display: block; animation: spotIn .6s cubic-bezier(.2,.9,.3,1.2) both, pulse 1.8s 0.6s ease-in-out infinite; }
-.spot .lbl { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); white-space: nowrap;
-  background: var(--coeur); color: #fff; font: 800 15px/1 var(--display); letter-spacing: .1em; text-transform: uppercase;
-  padding: 7px 10px 6px; border-radius: 999px; display: flex; gap: 6px; align-items: center; }
-.spot .lbl svg { width: 13px; height: 13px; fill: #fff; }
-@keyframes spotIn { from { transform: scale(1.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-@keyframes pulse { 50% { box-shadow: 0 0 0 200vmax rgba(4,12,24,.55), 0 0 40px 10px rgba(229,32,46,.85); } }
-
-.play-big { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; border: 0; cursor: pointer;
-  background: var(--coeur); color: #fff; border-radius: 999px; padding: 16px 24px; font: 800 22px/1 var(--display);
-  letter-spacing: .06em; text-transform: uppercase; box-shadow: 0 10px 40px rgba(229,32,46,.5); }
-.play-big.show { display: block; }
-
-/* ---------- panneau ---------- */
-.intro { display: grid; gap: 14px; }
-.panel { display: grid; gap: 22px; align-content: safe center; max-height: 100%; overflow: auto; padding: 4px; }
-.eyebrow { font: 800 15px/1.2 var(--display); letter-spacing: .16em; text-transform: uppercase; color: var(--brume); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.eyebrow .x { color: var(--coeur); }
-h1 { margin: 0; font: 900 clamp(48px, 6vw, 84px)/.88 var(--display); text-transform: uppercase; letter-spacing: -.005em; text-wrap: balance; }
-h1 em { font-style: normal; color: var(--coeur); }
-.lead { margin: 0; color: var(--brume); max-width: 42ch; }
-.lead strong { color: var(--ecume); font-weight: 700; }
-
-form { display: grid; gap: 12px; }
-.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-label { display: grid; gap: 6px; font-size: 14px; font-weight: 700; color: var(--brume); letter-spacing: .02em; }
-input { width: 100%; height: 52px; border-radius: 12px; border: 1px solid rgba(159,179,201,.35); background: var(--houle);
-  padding: 0 14px; font-size: 18px; color: var(--ecume); }
-input::placeholder { color: rgba(159,179,201,.55); }
-input:focus { border-color: var(--ciel); outline: none; box-shadow: 0 0 0 3px rgba(143,208,255,.25); }
-.go { height: 56px; border: 0; border-radius: 12px; background: var(--coeur); color: #fff; cursor: pointer;
-  font: 800 22px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 10px; }
-.go:hover { background: #f23341; }
-.go svg { width: 20px; height: 20px; stroke: #fff; fill: none; stroke-width: 2.5; }
-.examples { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; color: var(--brume); }
-.chip { border: 1px solid rgba(159,179,201,.35); background: transparent; border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 14px; }
-.chip:hover { border-color: var(--ecume); }
-
-.msg { display: none; border-radius: 14px; padding: 16px; background: var(--houle); border-left: 4px solid var(--ciel); }
-.msg.show { display: grid; gap: 10px; }
-.msg p { margin: 0; }
-.msg .row { display: flex; flex-wrap: wrap; gap: 8px; }
-
-.climb { display: none; gap: 4px; }
-.climb.show { display: grid; }
-.climb small { font: 800 15px/1 var(--display); letter-spacing: .16em; text-transform: uppercase; color: var(--brume); }
-.climb .who { font: 900 clamp(40px, 5vw, 64px)/.9 var(--display); text-transform: uppercase; }
-.climb .h { font: 800 22px/1 var(--display); color: var(--ciel); font-variant-numeric: tabular-nums; }
-
-.thanks { display: none; gap: 14px; }
-.thanks.show { display: grid; animation: rise .7s cubic-bezier(.2,.8,.2,1) both; }
-.thanks .merci { margin: 0; font: 900 clamp(48px, 5.5vw, 80px)/.85 var(--display); text-transform: uppercase; }
-.thanks .merci span { color: var(--coeur); display: block; }
-.thanks .where { display: flex; flex-wrap: wrap; gap: 8px; }
-.pill { font: 800 16px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; padding: 8px 12px; border-radius: 8px; background: var(--houle); color: var(--ecume); font-variant-numeric: tabular-nums; }
-.pill.red { background: var(--coeur); color: #fff; }
-.thanks p { margin: 0; max-width: 46ch; }
-.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.fact { background: var(--houle); border-radius: 12px; padding: 12px 14px 12px; display: grid; gap: 2px; position: relative; overflow: hidden; }
-.fact small { font: 800 13px/1.1 var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--brume); }
-.fact b { font: 900 34px/1 var(--display); font-variant-numeric: tabular-nums; color: var(--ecume); }
-.fact b u { text-decoration: none; font-size: 20px; margin-left: 2px; color: var(--brume); }
-.fact span { font-size: 13px; line-height: 1.3; color: var(--brume); }
-.fact .gauge { position: absolute; right: 12px; top: 12px; bottom: 12px; width: 4px; border-radius: 4px; background: rgba(159,179,201,.25); }
-.fact .gauge i { position: absolute; left: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--coeur); transform: translateY(50%); box-shadow: 0 0 8px rgba(229,32,46,.8); }
-.neigh { color: var(--brume); font-size: 15px; }
-.neigh strong { color: var(--ecume); font-weight: 700; }
-.dyk { border-left: 3px solid var(--coeur); padding: 2px 0 2px 12px; color: var(--brume); font-size: 14px; max-width: 46ch; }
-.dyk b { color: var(--ecume); font-family: var(--display); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: 14px; }
-.thanks .sub { color: var(--brume); }
-.actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.btn { height: 46px; padding: 0 16px; border-radius: 10px; border: 1px solid rgba(159,179,201,.4); background: transparent; cursor: pointer;
-  font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 8px; }
-.btn:hover { border-color: var(--ecume); background: rgba(255,255,255,.04); }
-.btn.primary { background: var(--ecume); color: var(--abysse); border-color: var(--ecume); }
-@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-
-.proto { font-size: 13px; color: var(--brume); border-top: 1px solid rgba(159,179,201,.18); padding-top: 14px; }
-.proto b { color: var(--ecume); }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-
-.app[data-state="travel"] .intro, .app[data-state="travel"] form, .app[data-state="travel"] .examples,
-.app[data-state="done"] .intro, .app[data-state="done"] form, .app[data-state="done"] .examples { display: none; }
-
-/* ---------- mobile : la vidéo en haut, une feuille de contrôle en bas (pas de superposition) ---------- */
-@media (max-width: 860px) {
-  html, body { overflow: hidden; }
-  .app { display: flex; flex-direction: column; gap: 0; padding: 0; height: 100%; height: 100dvh; }
-  .stage { flex: 1 1 auto; min-height: 150px; width: 100%; height: auto; max-height: none; aspect-ratio: auto;
-    border-radius: 0; box-shadow: none; }
-  .panel { position: relative; z-index: 2; flex: 0 1 auto; max-height: 64%; margin-top: -20px; border-radius: 20px 20px 0 0;
-    background: var(--abysse); box-shadow: 0 -12px 30px rgba(0,0,0,.35); gap: 12px; align-content: start; grid-auto-rows: max-content;
-    padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch; transition: max-height .45s ease; }
-  .panel::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: rgba(159,179,201,.35); margin: 0 auto 2px; }
-  .app[data-state="travel"] .panel { max-height: 118px; }
-  .app[data-state="done"] .panel { max-height: 60%; }
-  .app[data-state="travel"] .proto { display: none; }
-  .eyebrow { display: none; }
-  .intro { gap: 6px; }
-  h1 { font-size: clamp(34px, 10vw, 46px); }
-  .lead { font-size: 15px; line-height: 1.4; }
-  .fields { gap: 8px; }
-  label { font-size: 13px; }
-  input { height: 50px; font-size: 17px; }
-  .go { height: 52px; font-size: 20px; }
-  .examples { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
-  .examples::-webkit-scrollbar { display: none; }
-  .chip { white-space: nowrap; }
-  .proto { font-size: 12px; padding-top: 10px; }
-  .climb.show { grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: 12px; }
-  .climb small { grid-column: 1 / -1; font-size: 13px; }
-  .climb .who { font-size: 30px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .climb .h { font-size: 17px; white-space: nowrap; }
-  .climb .h .ad { display: none; }
-  .examples { white-space: nowrap; }
-  .app[data-state="done"] .alti .cur b { display: none; }
-  .thanks { gap: 10px; }
-  .thanks .merci { font-size: clamp(38px, 11vw, 54px); }
-  .thanks .merci span { display: inline; }
-  .thanks .sub { font-size: 14px; }
-  .pill { font-size: 14px; padding: 7px 10px; }
-  .fact { padding: 10px 12px; }
-  .fact b { font-size: 26px; }
-  .fact span { font-size: 12px; }
-  .btn { height: 42px; font-size: 14px; padding: 0 12px; }
-  .alti { top: calc(58px + env(safe-area-inset-top)); bottom: 34px; right: 8px; }
-  .alti .lab { font-size: 13px; }
-  .tag { top: calc(14px + env(safe-area-inset-top)); left: 14px; }
-  .sound { top: calc(8px + env(safe-area-inset-top)); }
-  .play-big { font-size: 19px; padding: 14px 20px; white-space: nowrap; }
-  .spot .lbl { font-size: 13px; padding: 6px 9px 5px; }
-}
-@media (max-width: 380px) {
-  .go { font-size: 18px; letter-spacing: .03em; }
-  h1 { font-size: 32px; }
-  .lead { font-size: 14px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .stage video, .alti .cur { transition: none; }
-  .spot.show, .thanks.show { animation: none; }
-}
-</style>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","three/addons/":"./vendor/addons/"}}</script>
 </head>
 <body>
-<div class="app" id="app" data-state="idle">
+<div class="app" id="app" data-view="home">
   <div class="stage" id="stage">
-    <div class="cam" id="cam">
-    <video id="v" src="mast.mp4" poster="poster.jpg" muted playsinline preload="auto"></video>
-    <div class="spot" id="spot"><div class="lbl"><svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg><span id="spotTxt">Vous êtes ici</span></div></div>
-    </div>
+    <canvas id="gl" aria-label="Le mât d'Initiatives-Cœur en 3D, couvert de noms de donateurs"></canvas>
+    <div class="loading" id="loading"><div class="spin"></div><span>Le bateau arrive au ponton…</span></div>
     <div class="veil"></div>
+    <div class="spot" id="spot"><div class="lbl"><svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg><span id="spotTxt">Vous êtes ici</span></div></div>
+    <div class="hover" id="hover"></div>
+    <div class="tip" id="tip" hidden></div>
     <div class="tag"><svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg>Initiatives-Cœur</div>
+    <div class="face" id="faceLbl">Tribord</div>
     <button class="sound" id="sound" type="button" aria-pressed="true" aria-label="Son">
       <svg class="on" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
       <svg class="off" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m17 10 4 4m0-4-4 4"/></svg>
     </button>
-    <div class="alti" id="alti" aria-hidden="true"><div class="rail"></div>
+    <div class="alti" id="alti" role="slider" aria-label="Hauteur sur le mât" aria-valuemin="0" aria-valuemax="30" tabindex="0"><div class="rail"></div>
       <div class="target" id="altiTarget"><svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg></div>
       <div class="cur" id="altiCur"><b id="altiVal">1,2 m</b><i></i></div>
     </div>
-    <button class="play-big" id="playBig" type="button">Voir mon nom ▸</button>
+    <div class="ctrls">
+      <button type="button" id="btnFlip" title="Passer de l'autre côté du mât"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg><span id="flipTxt">Bâbord</span></button>
+      <button type="button" id="btnOver" title="Vue d'ensemble du bateau"><svg viewBox="0 0 24 24"><path d="M12 3v15M12 3 6 16h6M12 6l6 10h-6M3 19c3 2 15 2 18 0"/></svg><span>Bateau</span></button>
+      <button type="button" id="btnIn" aria-label="Zoomer">+</button>
+      <button type="button" id="btnOut" aria-label="Dézoomer">−</button>
+    </div>
+    <div class="hint" id="hint">Glissez pour monter le long du mât · ⇆ pour tourner autour</div>
+    <div class="pickbar" id="pickbar" hidden><b>Choisissez votre place</b><span>Touchez une case libre <i class="free"></i></span></div>
   </div>
 
   <section class="panel" id="panel" aria-live="polite">
-    <div class="intro">
-      <div class="eyebrow">Initiatives-Cœur <span class="x">×</span> Mécénat Chirurgie Cardiaque</div>
-      <h1>Votre nom est <em>sur le mât.</em></h1>
-      <p class="lead">Pour <strong>10 € ou plus</strong>, votre nom navigue avec le bateau. Saisissez-le : la caméra monte le long du mât jusqu'à vous.</p>
-    </div>
-    <form id="form" autocomplete="off" novalidate>
-      <div class="fields">
-        <label for="prenom">Prénom<input id="prenom" name="prenom" placeholder="Camille" autocapitalize="words" spellcheck="false"></label>
-        <label for="nom">Nom<input id="nom" name="nom" placeholder="Martin" autocapitalize="words" spellcheck="false"></label>
+    <!-- accueil -->
+    <div class="v-home">
+      <div class="intro">
+        <div class="eyebrow">Initiatives-Cœur <span class="x">×</span> Mécénat Chirurgie Cardiaque</div>
+        <h1>Votre nom <em>sur le mât.</em></h1>
+        <p class="lead">Pour <strong>10 € ou plus</strong>, votre nom embarque sur le mât de l'IMOCA de Violette Dorange. Chaque don aide à faire opérer du cœur un enfant venu de loin.</p>
       </div>
-      <button class="go" type="submit">Monter jusqu'à mon nom
-        <svg viewBox="0 0 24 24"><path d="M12 20V4M5 11l7-7 7 7"/></svg></button>
-    </form>
-    <div class="examples" id="examples">Exemples :</div>
-    <div class="msg" id="msg"></div>
+      <div class="stats" id="stats"></div>
+      <button class="go" id="btnDon" type="button">Mettre mon nom sur le mât <svg viewBox="0 0 24 24"><path d="M12 20V4M5 11l7-7 7 7"/></svg></button>
+      <form id="form" autocomplete="off" novalidate>
+        <div class="formtitle">Votre nom est déjà à bord ? Retrouvez-le</div>
+        <div class="fields">
+          <label for="prenom">Prénom<input id="prenom" name="prenom" placeholder="Camille" autocapitalize="words" spellcheck="false"></label>
+          <label for="nom">Nom<input id="nom" name="nom" placeholder="Martin" autocapitalize="words" spellcheck="false"></label>
+        </div>
+        <button class="go ghost" type="submit">Monter jusqu'à mon nom</button>
+      </form>
+      <div class="msg" id="msg"></div>
+      <div class="examples" id="examples"></div>
+    </div>
 
-    <div class="climb" id="climb"><small>Montée vers</small><div class="who" id="climbWho"></div><div class="h" id="climbH"></div></div>
+    <!-- montée -->
+    <div class="climb v-travel"><small>Montée vers</small><div class="who" id="climbWho"></div><div class="h" id="climbH"></div></div>
 
-    <div class="thanks" id="thanks">
-      <h2 class="merci">Merci <span id="tName"></span></h2>
+    <!-- merci / mon don -->
+    <div class="thanks v-done" id="thanks">
+      <h2 class="merci"><b id="tMerci">Merci </b><span id="tName"></span></h2>
       <div class="where" id="tWhere"></div>
+      <blockquote class="quote" id="tQuote" hidden></blockquote>
+      <div class="pcard" id="tPerso" hidden></div>
+      <div class="kid" id="tKid" hidden></div>
       <div class="facts" id="tFacts"></div>
       <p class="neigh" id="tNeigh"></p>
-      <p>Votre nom navigue désormais sur le mât d'Initiatives-Cœur.</p>
-      <p class="sub">Votre don aide Mécénat Chirurgie Cardiaque à faire opérer en France des enfants atteints de malformations cardiaques, venus de pays où ils ne peuvent pas être soignés. Merci de contribuer à sauver des enfants.</p>
+      <div class="near" id="tNear"></div>
+      <div class="mapcard" id="tMap"><div class="mapsvg" id="tMapSvg"></div><p class="mapcap" id="tMapCap"></p></div>
       <div class="actions">
         <button class="btn primary" id="replay" type="button">Rejouer la montée</button>
         <button class="btn" id="copy" type="button">Partager</button>
         <button class="btn" id="again" type="button">Chercher un autre nom</button>
-        <button class="btn" id="full" type="button">Toute la montée</button>
+        <button class="btn" id="myCard" type="button">Ma fiche publique</button>
+        <button class="btn" id="btnDon2" type="button">Faire un don</button>
+        <a class="btn" id="shop" href="#" target="_blank" rel="noopener">Boutique solidaire</a>
       </div>
       <aside class="dyk"><b>Le saviez-vous ?</b> <span id="tDyk"></span></aside>
     </div>
-    <p class="proto"><b>Prototype de démonstration.</b> Noms fictifs (<span id="count"></span> donateurs) et vidéo de synthèse : la vraie vidéo filmée le long du mât prendra sa place. Données du mât : règles de la classe IMOCA et Lorima ; horizon et gîte calculés à partir de la hauteur.</p>
+
+    <!-- parcours de don -->
+    <div class="don v-don" id="don">
+      <div class="donhead"><button class="back" id="donBack" type="button" aria-label="Retour">‹</button><div class="steps" id="steps"></div></div>
+      <div class="dstep" data-step="1">
+        <h2>Votre don</h2>
+        <div class="amounts" id="amounts"></div>
+        <label class="other">Autre montant<input id="amtOther" inputmode="numeric" placeholder="€" maxlength="5"></label>
+        <div class="tier" id="tier"></div>
+        <p class="impact" id="impact"></p>
+        <button class="go" type="button" data-next>Continuer</button>
+      </div>
+      <div class="dstep" data-step="2">
+        <h2>Votre place sur le mât</h2>
+        <div id="placeBox"></div>
+        <div class="quick" id="quick"></div>
+        <button class="go" type="button" data-next id="placeNext">Continuer</button>
+      </div>
+      <div class="dstep" data-step="3">
+        <h2>Ce qui sera écrit</h2>
+        <div class="fields">
+          <label>Prénom<input id="dPrenom" autocapitalize="words" maxlength="30"></label>
+          <label>Nom<input id="dNom" autocapitalize="words" maxlength="40"></label>
+        </div>
+        <canvas class="sticker" id="sticker" width="900" height="150" aria-label="Aperçu de votre autocollant"></canvas>
+        <label>Ville <small>(pour la carte des donateurs, jamais l'adresse)</small><input id="dVille" list="villesList" maxlength="60"></label>
+        <datalist id="villesList"></datalist>
+        <label>Votre message <small>(facultatif, affiché après validation)</small><textarea id="dMsg" rows="3" maxlength="200"></textarea><span class="count" id="dCount">0 / 200</span></label>
+        <details class="more"><summary>Ma fiche publique (facultatif)</summary>
+          <label>Quelques mots sur vous<textarea id="dBio" rows="2" maxlength="140" placeholder="Ex. : Prof de SVT, ma classe suit le bateau"></textarea></label>
+          <label>Une photo<input type="file" id="dPhoto" accept="image/*"></label>
+          <img id="dPhotoPrev" class="photoprev" alt="" hidden>
+          <label class="check"><input type="checkbox" id="dPub" checked> Afficher ma photo et ces quelques mots sur ma fiche</label>
+        </details>
+        <label class="check"><input type="checkbox" id="dOk"> J'accepte que mon prénom, mon nom, ma ville et mon message apparaissent sur le mât et sur ce site.</label>
+        <button class="go" type="button" data-next id="infoNext">Continuer</button>
+      </div>
+      <div class="dstep" data-step="4">
+        <h2>Récapitulatif</h2>
+        <div class="recap" id="recap"></div>
+        <button class="go" type="button" id="pay">Payer</button>
+        <p class="fine" id="payNote"></p>
+      </div>
+    </div>
+
+    <p class="proto"><b>Prototype de démonstration.</b> Donateurs, messages, fiches d'enfants et répartition par pays sont fictifs (sauf les personnalités) ; le paiement n'est pas branché. Modèle 3D : bateau Initiatives-Cœur de la visite virtuelle.</p>
   </section>
 </div>
 
-<script>
-const DATA = {"video":{"duration":66.833,"width":720,"height":1280,"fps":30.0},"mast_m":29.0,"t_motion":1.2,"track":[[0.0,1.15],[0.25,1.15],[0.5,1.15],[0.75,1.15],[1.0,1.15],[1.25,1.15],[1.5,1.15],[1.75,1.17],[2.0,1.2],[2.25,1.25],[2.5,1.32],[2.75,1.42],[3.0,1.53],[3.25,1.64],[3.5,1.76],[3.75,1.87],[4.0,1.99],[4.25,2.11],[4.5,2.22],[4.75,2.34],[5.0,2.46],[5.25,2.57],[5.5,2.69],[5.75,2.8],[6.0,2.92],[6.25,3.04],[6.5,3.15],[6.75,3.27],[7.0,3.39],[7.25,3.5],[7.5,3.62],[7.75,3.73],[8.0,3.85],[8.25,3.97],[8.5,4.08],[8.75,4.2],[9.0,4.32],[9.25,4.43],[9.5,4.55],[9.75,4.67],[10.0,4.78],[10.25,4.9],[10.5,5.01],[10.75,5.13],[11.0,5.25],[11.25,5.36],[11.5,5.48],[11.75,5.6],[12.0,5.71],[12.25,5.83],[12.5,5.94],[12.75,6.06],[13.0,6.18],[13.25,6.29],[13.5,6.41],[13.75,6.53],[14.0,6.64],[14.25,6.76],[14.5,6.88],[14.75,6.99],[15.0,7.11],[15.25,7.22],[15.5,7.34],[15.75,7.46],[16.0,7.57],[16.25,7.69],[16.5,7.81],[16.75,7.92],[17.0,8.04],[17.25,8.16],[17.5,8.27],[17.75,8.39],[18.0,8.5],[18.25,8.62],[18.5,8.74],[18.75,8.85],[19.0,8.97],[19.25,9.09],[19.5,9.2],[19.75,9.32],[20.0,9.43],[20.25,9.55],[20.5,9.67],[20.75,9.78],[21.0,9.9],[21.25,10.02],[21.5,10.13],[21.75,10.25],[22.0,10.37],[22.25,10.48],[22.5,10.6],[22.75,10.71],[23.0,10.83],[23.25,10.95],[23.5,11.06],[23.75,11.18],[24.0,11.3],[24.25,11.41],[24.5,11.53],[24.75,11.64],[25.0,11.76],[25.25,11.88],[25.5,11.99],[25.75,12.11],[26.0,12.23],[26.25,12.34],[26.5,12.46],[26.75,12.58],[27.0,12.69],[27.25,12.81],[27.5,12.92],[27.75,13.04],[28.0,13.16],[28.25,13.27],[28.5,13.39],[28.75,13.51],[29.0,13.62],[29.25,13.74],[29.5,13.86],[29.75,13.97],[30.0,14.09],[30.25,14.2],[30.5,14.32],[30.75,14.44],[31.0,14.55],[31.25,14.67],[31.5,14.79],[31.75,14.9],[32.0,15.02],[32.25,15.13],[32.5,15.25],[32.75,15.37],[33.0,15.48],[33.25,15.6],[33.5,15.72],[33.75,15.83],[34.0,15.95],[34.25,16.07],[34.5,16.18],[34.75,16.3],[35.0,16.41],[35.25,16.53],[35.5,16.65],[35.75,16.76],[36.0,16.88],[36.25,17.0],[36.5,17.11],[36.75,17.23],[37.0,17.35],[37.25,17.46],[37.5,17.58],[37.75,17.69],[38.0,17.81],[38.25,17.93],[38.5,18.04],[38.75,18.16],[39.0,18.28],[39.25,18.39],[39.5,18.51],[39.75,18.62],[40.0,18.74],[40.25,18.86],[40.5,18.97],[40.75,19.09],[41.0,19.21],[41.25,19.32],[41.5,19.44],[41.75,19.56],[42.0,19.67],[42.25,19.79],[42.5,19.9],[42.75,20.02],[43.0,20.14],[43.25,20.25],[43.5,20.37],[43.75,20.49],[44.0,20.6],[44.25,20.72],[44.5,20.83],[44.75,20.95],[45.0,21.07],[45.25,21.18],[45.5,21.3],[45.75,21.42],[46.0,21.53],[46.25,21.65],[46.5,21.77],[46.75,21.88],[47.0,22.0],[47.25,22.11],[47.5,22.23],[47.75,22.35],[48.0,22.46],[48.25,22.58],[48.5,22.7],[48.75,22.81],[49.0,22.93],[49.25,23.05],[49.5,23.16],[49.75,23.28],[50.0,23.39],[50.25,23.51],[50.5,23.63],[50.75,23.74],[51.0,23.86],[51.25,23.98],[51.5,24.09],[51.75,24.21],[52.0,24.32],[52.25,24.44],[52.5,24.56],[52.75,24.67],[53.0,24.79],[53.25,24.91],[53.5,25.02],[53.75,25.14],[54.0,25.26],[54.25,25.37],[54.5,25.49],[54.75,25.6],[55.0,25.72],[55.25,25.84],[55.5,25.95],[55.75,26.07],[56.0,26.19],[56.25,26.3],[56.5,26.42],[56.75,26.53],[57.0,26.65],[57.25,26.77],[57.5,26.88],[57.75,27.0],[58.0,27.12],[58.25,27.23],[58.5,27.35],[58.75,27.47],[59.0,27.58],[59.25,27.7],[59.5,27.81],[59.75,27.93],[60.0,28.05],[60.25,28.16],[60.5,28.28],[60.75,28.4],[61.0,28.51],[61.25,28.63],[61.5,28.75],[61.75,28.86],[62.0,28.97],[62.25,29.07],[62.5,29.17],[62.75,29.24],[63.0,29.31],[63.25,29.36],[63.5,29.39],[63.75,29.41],[64.0,29.42],[64.25,29.43],[64.5,29.43],[64.75,29.43],[65.0,29.43],[65.25,29.43],[65.5,29.43],[65.75,29.43],[66.0,29.43],[66.25,29.43],[66.5,29.43],[66.75,29.43],[67.0,29.43]],"names":[["Catherine","Kowalski",0.0133,656.9,171.9,337.5,1.1,1,1,"g"],["Céline","Salaün",0.0133,656.9,351.9,535.6,1.1,1,1,"d"],["Mei","Rossi",2.18,640.3,201.9,298.1,1.2,1,2,"g"],["Brieuc","Bonnet",2.18,640.3,396.2,538.8,1.2,1,2,"d"],["Tom","Bouzid",2.5467,638.9,191.9,310.0,1.3,1,3,"g"],["Jean-Luc","Dumont",2.5467,638.9,379.4,548.8,1.3,1,3,"d"],["Louis","Pierre",2.8467,642.6,191.9,311.2,1.4,1,4,"g"],["Samir","Lacroix",2.8467,642.6,398.1,536.2,1.4,1,4,"d"],["Thi","Renard",3.08,638.9,195.6,304.4,1.6,1,5,"g"],["Françoise","Caron",3.08,638.9,383.1,546.9,1.6,1,5,"d"],["Olivier","Coat",3.3133,637.9,191.9,311.2,1.7,1,6,"g"],["Gérard","Schneider",3.3133,637.9,380.0,549.4,1.7,1,6,"d"],["Ronan","Rossi",3.5467,637.1,190.0,313.1,1.8,1,7,"g"],["Leïla","Salaün",3.5467,637.1,407.5,529.4,1.8,1,7,"d"],["Hervé","Durand",3.78,636.6,183.1,321.9,1.9,1,8,"g"],["Apolline","Lefebvre",3.78,636.6,379.4,549.4,1.9,1,8,"d"],["Fatima","Muller",4.0467,642.8,184.4,321.2,2.0,1,9,"g"],["Tanguy","Ferreira",4.0467,642.8,385.6,544.4,2.0,1,9,"d"],["Valérie","Haddad",4.28,641.2,176.9,330.0,2.1,1,10,"g"],["Jérôme","Costa",4.28,641.2,396.2,536.9,2.1,1,10,"d"],["Minh","Vidal",4.5133,640.2,196.9,303.1,2.2,1,11,"g"],["Karim","Cadiou",4.5133,640.2,400.0,535.0,2.2,1,11,"d"],["Soizic","Barbier",4.7467,639.0,182.5,323.8,2.3,1,12,"g"],["Alice","Cherif",4.7467,639.0,408.8,528.8,2.3,1,12,"d"],["Jean-Luc","Duval",4.98,641.4,175.0,333.1,2.4,1,13,"g"],["Jean-Pierre","Schneider",5.0133,641.5,421.9,517.5,2.4,1,13,"d"],["Thi","Moreau",5.2133,637.1,193.1,307.8,2.6,1,14,"g"],["Antoine","Vincent",5.2133,637.1,383.8,546.2,2.6,1,14,"d"],["Samir","Roussel",5.48,642.9,181.9,324.4,2.7,1,15,"g"],["Hervé","Barbier",5.48,642.9,397.5,537.5,2.7,1,15,"d"],["Olivier","Lefèvre-Pontalis",5.7133,642.3,185.9,318.1,2.8,1,16,"g"],["Monique","Petit",5.7133,639.6,397.5,537.5,2.8,1,16,"d"],["Camille","Costa",5.9467,640.9,183.1,321.9,2.9,1,17,"g"],["Nolwenn","Michel",5.9467,640.9,385.0,545.6,2.9,1,17,"d"],["Adam","Pierre",6.18,639.9,189.4,314.4,3.0,1,18,"g"],["Léa","Rossi",6.18,639.9,421.9,518.1,3.0,1,18,"d"],["Christine","Diop",6.4133,640.0,181.2,324.4,3.1,1,19,"g"],["Sophie","Fischer",6.4133,640.0,391.2,541.9,3.1,1,19,"d"],["Romane","Perrin",6.6467,638.0,180.0,326.9,3.2,1,20,"g"],["Matteo","Nédélec",6.6467,638.0,386.2,545.0,3.2,1,20,"d"],["Brigitte","Marchand",6.88,637.8,171.9,338.8,3.3,1,21,"g"],["Chloé","Morvan",6.88,637.8,395.6,536.9,3.3,1,21,"d"],["Zoé","Bourgeois",7.1133,636.6,180.0,326.2,3.4,1,22,"g"],["Jade","Aubert",7.1133,636.6,405.0,530.6,3.4,1,22,"d"],["Maël","Blanc",7.38,642.0,195.6,305.6,3.6,1,23,"g"],["Aurélien","Morin",7.38,642.0,391.9,540.0,3.6,1,23,"d"],["Lukas","Nguyen",7.6133,641.5,181.9,325.0,3.7,1,24,"g"],["Alexandre","Meunier",7.6133,641.5,381.2,548.1,3.7,1,24,"d"],["Juliette","Moreau",7.8467,639.4,175.6,331.9,3.8,1,25,"g"],["Émilie","d'Almeida",7.8467,639.4,382.5,546.9,3.8,1,25,"d"],["Noé","Gautier",8.08,639.5,191.2,311.9,3.9,1,26,"g"],["Inès","López",8.08,639.5,415.0,523.8,3.9,1,26,"d"],["Amina","Chevalier",8.3133,638.5,171.9,338.1,4.0,1,27,"g"],["Morgane","Coat",8.3133,638.5,395.6,538.8,4.0,1,27,"d"],["Gwenaël","Guillou",8.5467,637.5,173.1,335.6,4.1,1,28,"g"],["Morgane","Gaillard",8.5467,637.5,380.6,548.1,4.1,1,28,"d"],["Marc-Antoine","Abgrall",8.8133,643.4,171.9,338.1,4.2,1,29,"g"],["Camille","Martin",8.8133,643.4,393.1,539.4,4.2,1,29,"d"],["Mathis","Sánchez",9.0467,642.0,174.4,333.8,4.3,1,30,"g"],["Pauline","Meunier",9.0467,642.0,384.4,546.9,4.3,1,30,"d"],["Mathilde","Lemoine",9.28,641.2,171.9,339.4,4.4,1,31,"g"],["Mamadou","Roussel",9.28,641.2,381.9,547.5,4.4,1,31,"d"],["Frédéric","Bourgeois",9.5133,640.2,171.9,338.1,4.5,1,32,"g"],["Sofia","Lemaire",9.5133,640.2,398.1,536.9,4.5,1,32,"d"],["Nathan","Marie",9.7467,639.6,185.0,320.0,4.7,1,33,"g"],["Paul","Boyer",9.7467,639.6,415.6,523.8,4.7,1,33,"d"],["Jules","Le Berre",9.98,638.0,180.6,325.0,4.8,1,34,"g"],["Nathalie","Pierre",9.98,638.0,392.5,540.6,4.8,1,34,"d"],["Morgane","Lefèvre",10.2133,637.9,171.9,338.8,4.9,1,35,"g"],["Baptiste","Bertrand",10.2133,637.9,380.6,548.1,4.9,1,35,"d"],["Baptiste","Lucas",10.48,643.5,180.0,328.1,5.0,1,36,"g"],["Chloé","Lucas",10.48,643.5,405.6,530.6,5.0,1,36,"d"],["Chloé","Le Bris",10.7133,642.3,186.2,318.8,5.1,1,37,"g"],["Timothée","Philippe",10.7133,642.3,381.2,547.5,5.1,1,37,"d"],["Côme","Laurent",10.9467,641.5,181.9,323.8,5.2,1,38,"g"],["Baptiste","Diallo",10.9467,641.5,395.0,538.8,5.2,1,38,"d"],["Catherine","Weber",11.18,640.8,171.9,338.8,5.3,1,39,"g"],["Lou","Nguyen",11.18,640.8,408.1,528.8,5.3,1,39,"d"],["Ethan","Schmitt",11.4133,639.8,183.1,323.1,5.4,1,40,"g"],["Valérie","Abgrall",11.4133,639.8,391.9,540.0,5.4,1,40,"d"],["Giulia","Lopes",11.6467,638.6,189.4,313.1,5.5,1,41,"g"],["Nolwenn","Faure",11.6467,638.6,390.6,541.9,5.5,1,41,"d"],["Valérie","Le Guen",11.88,637.0,175.0,333.1,5.7,1,42,"g"],["Frédéric","Colin",11.88,637.0,396.9,536.9,5.7,1,42,"d"],["Ronan","Pierre",12.1467,643.0,187.5,316.9,5.8,1,43,"g"],["Patrick","Salaün",12.1467,643.0,395.0,538.8,5.8,1,43,"d"],["Capucine","Roussel",12.38,643.1,170.6,339.4,5.9,1,44,"g"],["Louise","Lopes",12.38,643.1,401.2,534.4,5.9,1,44,"d"],["Thi","Lucas",12.6133,641.3,200.6,298.8,6.0,1,45,"g"],["Joséphine","Le Meur",12.6133,641.3,380.6,549.4,6.0,1,45,"d"],["Hervé","Picard",12.8467,640.1,186.9,316.2,6.1,1,46,"g"],["Lukas","Le Floch",12.8467,640.1,391.9,541.2,6.1,1,46,"d"],["Lina","Kowalski",13.08,639.7,183.8,320.6,6.2,1,47,"g"],["Romain","Roger",13.08,639.7,396.9,537.5,6.2,1,47,"d"],["Manon","Giraud",13.3133,638.1,182.2,323.1,6.3,1,48,"g"],["Lou","O'Brien",13.3133,638.1,409.4,527.5,6.3,1,48,"d"],["Gérard","Benoît",13.5467,636.9,183.1,323.1,6.4,1,49,"g"],["Minh","Lacroix",13.5467,636.9,403.1,532.5,6.4,1,49,"d"],["Thierry","Cherif",13.78,636.6,181.9,324.4,6.5,1,50,"g"],["Benoît","Caron",13.78,636.6,402.5,532.5,6.5,1,50,"d"],["Hélène","Garcia",14.0467,642.0,182.5,323.1,6.7,1,51,"g"],["Léa","Yilmaz",14.0467,642.0,414.4,523.8,6.7,1,51,"d"],["Loïc","Nicolas",14.28,641.0,190.0,312.5,6.8,1,52,"g"],["Sacha","Gaillard",14.28,641.0,394.4,538.8,6.8,1,52,"d"],["Marion","Robert",14.5133,640.0,181.9,325.0,6.9,1,53,"g"],["Bérénice","Vidal",14.5133,640.0,394.4,539.4,6.9,1,53,"d"],["Anna","Tanguy",14.7467,639.6,185.0,319.4,7.0,1,54,"g"],["Amina","Perrin",14.7467,639.6,401.9,532.5,7.0,1,54,"d"],["Céline","Lefèvre-Pontalis",15.0133,641.1,185.6,318.1,7.1,1,55,"g"],["Maxime","Caron",14.98,640.6,394.4,539.4,7.1,1,55,"d"],["Lukas","Gautier",15.2133,637.3,183.1,323.1,7.2,1,56,"g"],["Noah","Renard",15.2133,637.3,402.5,532.5,7.2,1,56,"d"],["Christine","Gautier",15.48,643.1,171.9,339.4,7.3,1,57,"g"],["Manon","Koné",15.48,643.1,405.0,531.2,7.3,1,57,"d"],["Laurent","Fernandes",15.7133,642.1,170.6,340.0,7.4,1,58,"g"],["Amina","Dos Santos",15.7133,642.1,380.0,548.1,7.4,1,58,"d"],["Monique","André",15.9467,641.5,176.9,331.9,7.5,1,59,"g"],["Camille","Bertrand",15.9467,641.5,380.6,548.1,7.5,1,59,"d"],["Maël","Garcia",16.18,640.8,191.9,310.6,7.7,1,60,"g"],["Hugo","Aubert",16.18,640.8,403.8,532.5,7.7,1,60,"d"],["Nathalie","Fournier",16.4133,638.9,171.2,340.0,7.8,1,61,"g"],["Jules","Mercier",16.4133,638.9,398.1,536.2,7.8,1,61,"d"],["Benoît","Mercier",16.6467,638.0,180.0,328.1,7.9,1,62,"g"],["Amina","Pierre",16.6467,638.0,401.9,532.5,7.9,1,62,"d"],["Côme","Olivier",16.88,637.0,186.9,317.5,8.0,1,63,"g"],["Juliette","Lambert",16.88,637.0,367.8,546.9,8.0,1,63,"d"],["Timothée","Meyer",17.1133,636.6,172.5,352.5,8.1,1,64,"g"],["Nicolas","Lemoine",17.1133,636.6,381.9,548.1,8.1,1,64,"d"],["Pierre-Yves","Henry",17.38,643.3,172.5,338.1,8.2,1,65,"g"],["Augustin","Philippe",17.38,643.3,381.2,547.5,8.2,1,65,"d"],["Loïc","Tanguy",17.6133,641.7,190.0,313.8,8.3,1,66,"g"],["Anne","Guérin",17.6133,641.7,403.8,530.6,8.3,1,66,"d"],["Adam","Mercier",17.8467,640.3,181.9,324.4,8.4,1,67,"g"],["Adam","Pham",17.8467,640.3,406.9,528.8,8.4,1,67,"d"],["Monique","Barbier",18.08,639.7,171.9,339.1,8.5,1,68,"g"],["Julien","Blanc",18.08,639.7,406.2,529.4,8.5,1,68,"d"],["Paul","Cadiou",18.3133,638.1,191.2,311.2,8.6,1,69,"g"],["Inès","Lemoine",18.3133,638.1,400.6,534.4,8.6,1,69,"d"],["Loïc","Russo",18.5467,637.3,195.9,305.0,8.8,1,70,"g"],["Mamadou","Coat",18.5467,637.3,390.0,543.1,8.8,1,70,"d"],["Marie-Charlotte","de Coatgoureden-Kerguelen",22.0133,640.4,171.2,338.1,10.4,2,1,"g"],["Louis","Abgrall",22.0133,637.3,401.9,533.1,10.4,2,1,"d"],["Jean-Michel","Laurent",22.2467,637.8,170.6,353.4,10.5,2,2,"g"],["Catherine","Barbier",22.2467,637.8,381.2,548.1,10.5,2,2,"d"],["Emma","Cherif",22.48,637.6,186.9,317.5,10.6,2,3,"g"],["Léo","Kerjean",22.48,637.6,408.8,528.1,10.6,2,3,"d"],["Thi","Fernandes",22.7467,643.2,180.6,325.0,10.7,2,4,"g"],["Pauline","Noël",22.7467,643.2,405.0,530.6,10.7,2,4,"d"],["Annaïg","Morin",22.98,642.5,184.4,320.0,10.8,2,5,"g"],["Timothée","Le Berre",22.98,642.5,381.2,547.5,10.8,2,5,"d"],["Fatima","Garnier",23.2133,641.0,180.0,328.1,10.9,2,6,"g"],["Louise","Salaün",23.2133,641.0,396.9,536.9,10.9,2,6,"d"],["Morgane","Kowalski",23.4467,640.5,172.5,336.9,11.0,2,7,"g"],["Jérôme","Lacroix",23.4467,640.5,388.1,543.8,11.0,2,7,"d"],["Guillaume","Koné",23.68,639.1,175.6,333.1,11.1,2,8,"g"],["Jean-Luc","Rivière",23.68,639.1,381.2,548.1,11.1,2,8,"d"],["Jean-Luc","Ferreira",23.9133,638.1,171.2,338.8,11.3,2,9,"g"],["Louis","Traoré",23.9133,638.1,405.6,530.6,11.3,2,9,"d"],["Olivier","Cadiou",24.1467,636.9,181.9,323.8,11.4,2,10,"g"],["Bérénice","Nédélec",24.1467,636.9,381.9,547.5,11.4,2,10,"d"],["Yassine","Leroux",24.4133,643.1,177.2,330.6,11.5,2,11,"g"],["Mathilde","Yilmaz",24.4133,643.1,385.3,545.6,11.5,2,11,"d"],["Nicolas","Dumas",24.6467,642.2,178.8,329.1,11.6,2,12,"g"],["Gaëlle","d'Almeida",24.6467,642.2,380.6,548.1,11.6,2,12,"d"],["Gabriel","López",24.88,641.6,183.1,321.9,11.7,2,13,"g"],["Patrick","Marie",24.88,641.6,401.2,534.4,11.7,2,13,"d"],["Augustin","Gourmelen",25.1133,640.4,170.6,338.8,11.8,2,14,"g"],["Leïla","Marie",25.1133,640.4,413.8,525.0,11.8,2,14,"d"],["Jean-Luc","Aubert",25.3467,639.6,171.9,338.8,11.9,2,15,"g"],["Michel","Lopes",25.3467,639.6,400.6,535.0,11.9,2,15,"d"],["Brigitte","Garcia",25.58,639.1,181.9,324.4,12.0,2,16,"g"],["Françoise","David",25.58,639.1,385.0,545.0,12.0,2,16,"d"],["Alice","Leroux",25.8133,637.7,188.8,314.4,12.1,2,17,"g"],["Martine","Lopes",25.8133,637.7,395.0,539.4,12.1,2,17,"d"],["Laurent","Morin",26.08,643.3,182.5,323.1,12.3,2,18,"g"],["Zoé","Garcia",26.08,643.3,414.4,523.8,12.3,2,18,"d"],["Jean-Luc","Dubois",26.3133,643.2,171.2,339.4,12.4,2,19,"g"],["Capucine","Lopes",26.3133,643.2,383.8,546.2,12.4,2,19,"d"],["Aurélien","Riou",26.5467,641.1,185.0,319.4,12.5,2,20,"g"],["Nicolas","O'Brien",26.5467,641.1,388.1,543.1,12.5,2,20,"d"],["Jérôme","Le Bihan",26.78,640.1,171.2,338.1,12.6,2,21,"g"],["Matteo","Lucas",26.78,640.1,400.0,535.6,12.6,2,21,"d"],["Louise","Gautier",27.0133,639.2,180.6,326.2,12.7,2,22,"g"],["Ronan","Duval",27.0133,639.2,405.0,531.2,12.7,2,22,"d"],["Marie-Hélène","Russo",27.2467,638.6,171.9,338.1,12.8,2,23,"g"],["Thierry","Coat",27.2467,638.6,403.8,531.9,12.8,2,23,"d"],["Ronan","Benoît",27.48,637.2,185.6,320.0,12.9,2,24,"g"],["Clémence","Tran",27.48,637.2,390.0,541.9,12.9,2,24,"d"],["Liam","Marie",27.7467,643.0,195.6,306.9,13.0,2,25,"g"],["Nolwenn","Le Roux",27.7467,643.0,381.9,548.1,13.0,2,25,"d"],["Hélène","Le Corre",27.98,642.2,173.8,335.6,13.1,2,26,"g"],["Goulven","Gourmelen",27.98,642.2,381.2,547.5,13.1,2,26,"d"],["Mei","Barbier",28.2133,641.3,193.1,310.0,13.2,2,27,"g"],["Pascal","Koné",28.2133,641.3,406.9,530.0,13.2,2,27,"d"],["Félix","Bourgeois",28.4467,640.5,177.5,331.2,13.4,2,28,"g"],["Martine","Le Guen",28.4467,640.5,382.5,547.5,13.4,2,28,"d"],["Capucine","Haddad",28.68,639.5,171.2,338.8,13.5,2,29,"g"],["Liam","Lefebvre",28.68,639.5,395.6,538.1,13.5,2,29,"d"],["Minh","Lucas",28.9133,638.7,193.1,309.4,13.6,2,30,"g"],["Margaux","Olivier",28.9133,638.7,386.2,545.0,13.6,2,30,"d"],["Leïla","Vincent",29.1467,637.5,186.9,318.1,13.7,2,31,"g"],["Paul","Dupont-Aignan",29.1467,637.5,380.6,548.8,13.7,2,31,"d"],["Juliette","Bouzid",29.4133,643.1,178.8,327.5,13.8,2,32,"g"],["Nathalie","Haddad",29.4133,643.1,381.9,547.5,13.8,2,32,"d"],["Hervé","Garcia",29.6467,642.0,186.9,316.9,13.9,2,33,"g"],["Christine","Le Moal",29.6467,642.0,380.3,548.1,13.9,2,33,"d"],["Aurélie","Lucas",29.88,641.2,183.1,321.2,14.0,2,34,"g"],["Anna","Fournier",29.88,641.2,395.0,538.1,14.0,2,34,"d"],["Fatima","Dos Santos",30.1133,640.6,171.9,338.1,14.1,2,35,"g"],["Anne","N'Diaye",30.1133,640.6,397.5,536.2,14.1,2,35,"d"],["Thomas","Traoré",30.3467,639.2,177.5,330.0,14.2,2,36,"g"],["Lucas","Kowalski",30.3467,639.2,388.1,543.1,14.2,2,36,"d"],["Yann","Le Bris",30.58,638.7,189.4,314.4,14.4,2,37,"g"],["Morgane","André",30.58,638.7,388.1,543.8,14.4,2,37,"d"],["Benoît","Ferreira",30.8133,637.1,180.0,326.9,14.5,2,38,"g"],["Emma","Lemaire",30.8133,637.1,392.5,540.6,14.5,2,38,"d"],["Alice","Chevalier",31.08,642.9,177.5,330.6,14.6,2,39,"g"],["Marie-Hélène","Picard",31.08,642.9,380.6,548.1,14.6,2,39,"d"],["Goulven","Durand",31.3133,641.9,173.8,335.0,14.7,2,40,"g"],["Siobhan","Clément",31.3133,641.9,380.6,548.8,14.7,2,40,"d"],["Valérie","Lemaire",31.5467,641.1,176.2,331.9,14.8,2,41,"g"],["Sarah","Cherif",31.5467,641.1,405.0,531.9,14.8,2,41,"d"],["Isabelle","Abgrall",31.78,641.4,176.9,331.2,14.9,2,42,"g"],["Léa","Leroy",31.78,641.4,420.6,519.4,14.9,2,42,"d"],["Aurélie","Kervella",32.0133,639.2,175.0,333.1,15.0,2,43,"g"],["Gabriel","Laurent",32.0133,639.2,388.1,543.1,15.0,2,43,"d"],["Minh","de La Roche",32.2467,638.2,171.9,338.8,15.1,2,44,"g"],["Lina","Traoré",32.2467,638.2,412.5,525.6,15.1,2,44,"d"],["Alice","Gautier",32.48,637.0,186.9,317.5,15.2,2,45,"g"],["Jean-Michel","Le Roux",32.48,637.0,380.6,548.1,15.2,2,45,"d"],["Ambre","Bernard",32.7467,643.4,176.9,329.4,15.4,2,46,"g"],["Anna","Brunet",32.7467,643.4,405.0,531.2,15.4,2,46,"d"],["Mamadou","Novak",32.98,642.9,172.5,338.1,15.5,2,47,"g"],["Moussa","Leroy",32.98,642.9,396.2,538.1,15.5,2,47,"d"],["Frédéric","Jaouen",33.2133,641.1,173.8,335.6,15.6,2,48,"g"],["Lucie","Petit",33.2133,641.1,416.2,522.5,15.6,2,48,"d"],["Patrick","Tran",33.4467,640.1,190.6,311.9,15.7,2,49,"g"],["Laetitia","Clément",33.4467,640.1,383.8,546.9,15.7,2,49,"d"],["Soizic","Dumas",33.68,639.3,184.4,321.2,15.8,2,50,"g"],["Nathan","Morin",33.68,639.3,399.4,535.6,15.8,2,50,"d"],["Mathilde","Le Roux",33.9133,638.3,171.2,339.4,15.9,2,51,"g"],["Sophie","Novak",33.9133,638.3,397.5,536.9,15.9,2,51,"d"],["Benoît","Gauthier",34.1467,637.1,176.2,333.1,16.0,2,52,"g"],["Thomas","André",34.1467,637.1,391.9,540.6,16.0,2,52,"d"],["Camille","Lambert",34.4133,643.2,173.1,337.5,16.1,2,53,"g"],["Marc-Antoine","Dumas",34.4133,643.2,380.0,549.4,16.1,2,53,"d"],["Laurent","Le Cam",34.6467,642.2,175.6,332.5,16.2,2,54,"g"],["Inès","Brun",34.6467,642.2,421.9,517.5,16.2,2,54,"d"],["Éric","Colin",34.88,641.6,201.9,297.5,16.4,2,55,"g"],["Diego","Henry",34.88,641.6,405.6,531.2,16.4,2,55,"d"],["Ousmane","Le Goff",35.1133,639.6,171.9,339.4,16.5,2,56,"g"],["Émilie","Rousseau",35.1133,639.6,383.1,546.9,16.5,2,56,"d"],["Jérôme","Perrin",35.3467,639.0,181.2,323.8,16.6,2,57,"g"],["Karim","Koné",35.3467,639.0,410.6,526.9,16.6,2,57,"d"],["Juliette","López",35.58,639.1,181.9,323.1,16.7,2,58,"g"],["Monique","Rivière",35.58,639.1,384.4,546.2,16.7,2,58,"d"],["Mathis","Gauthier",35.8133,637.3,175.0,335.6,16.8,2,59,"g"],["Léa","Blanc",35.8133,637.3,421.2,518.8,16.8,2,59,"d"],["Joséphine","Pham",36.0467,636.7,171.9,338.1,16.9,2,60,"g"],["Mathis","Leroux",36.0467,636.7,395.6,538.1,16.9,2,60,"d"],["Enzo","Nédélec",36.3133,642.1,183.8,321.9,17.0,2,61,"g"],["Paul","Morin",36.3133,642.1,415.6,522.8,17.0,2,61,"d"],["Mei","Le Corre",36.5467,641.5,187.5,316.2,17.1,2,62,"g"],["Paul","Prigent",36.5467,641.5,407.5,530.0,17.1,2,62,"d"],["Nicolas","Vincent",36.78,640.1,175.6,333.8,17.2,2,63,"g"],["Patrick","Renaud",36.78,640.1,351.9,541.9,17.2,2,63,"d"],["Aïssatou","Colin",37.0133,638.9,180.0,325.6,17.3,2,64,"g"],["Aïssatou","Gaillard",37.0133,638.9,351.9,547.5,17.3,2,64,"d"],["Noé","O'Brien",37.2467,638.2,190.6,311.9,17.5,2,65,"g"],["Lina","Marchand",37.2467,638.2,391.9,540.6,17.5,2,65,"d"],["Aurélie","Guérin",37.48,636.6,180.6,367.5,17.6,2,66,"g"],["Éric","David",37.48,636.6,418.8,520.0,17.6,2,66,"d"],["Gaspard","Kowalski",37.7467,643.4,171.2,339.4,17.7,2,67,"g"],["Minh","Nédélec",37.7467,643.4,351.9,536.9,17.7,2,67,"d"],["Ousmane","O'Brien",37.98,642.7,171.9,367.5,17.8,2,68,"g"],["Mehdi","Philippe",37.98,642.7,391.9,541.2,17.8,2,68,"d"],["Leïla","Rey",38.2133,641.7,204.4,295.6,17.9,2,69,"g"],["Minh","Pierre",38.2133,641.7,411.2,526.9,17.9,2,69,"d"],["Louise","Le Corre",38.4467,640.7,175.6,367.5,18.0,2,70,"g"],["Jean-Luc","Diop",38.4467,640.7,392.5,540.3,18.0,2,70,"d"],["Corentin","Kervella",41.9133,641.9,171.9,337.5,19.6,3,1,"g"],["Mamadou","Le Bihan",41.9133,641.9,351.9,548.1,19.6,3,1,"d"],["Bérénice","Cherif",42.1467,640.9,176.2,333.1,19.7,3,2,"g"],["Guillaume","Vincent",42.1467,640.9,352.2,548.8,19.7,3,2,"d"],["Anne-Sophie","Martin",42.38,640.3,170.6,367.5,19.8,3,3,"g"],["Ambre","Gauthier",42.38,640.3,385.6,545.6,19.8,3,3,"d"],["Erwan","Le Bihan",42.6133,639.0,176.9,331.2,20.0,3,4,"g"],["Lin","Lacroix",42.6133,639.0,415.0,524.4,20.0,3,4,"d"],["Gaëlle","Olivier",42.8467,638.6,185.0,320.0,20.1,3,5,"g"],["Brigitte","Vincent",42.8467,638.6,388.1,543.8,20.1,3,5,"d"],["Ronan","Boyer",43.08,637.6,188.1,316.2,20.2,3,6,"g"],["Inès","Coat",43.08,637.6,421.9,518.1,20.2,3,6,"d"],["Mathis","Benali",43.3467,642.8,185.0,320.0,20.3,3,7,"g"],["Sébastien","Lefebvre",43.3467,642.8,381.9,548.1,20.3,3,7,"d"],["Gaëlle","Morel",43.58,641.8,188.8,314.4,20.4,3,8,"g"],["Nathalie","Morin",43.58,641.8,393.1,540.0,20.4,3,8,"d"],["Françoise","Vidal",43.8133,641.9,176.9,331.2,20.5,3,9,"g"],["Corentin","Meyer",43.8133,641.9,388.1,544.4,20.5,3,9,"d"],["Sarah","Dupont",44.0467,640.7,183.8,321.9,20.6,3,10,"g"],["Jules","Caron",44.0467,640.7,408.1,528.1,20.6,3,10,"d"],["Siobhan","López",44.28,639.7,178.8,327.5,20.7,3,11,"g"],["Louis","Martin-Lavigne",44.28,639.5,380.0,549.4,20.7,3,11,"d"],["Leïla","Nédélec",44.5133,637.9,184.4,320.6,20.8,3,12,"g"],["Arthur","Pham",44.5133,637.9,403.8,531.9,20.8,3,12,"d"],["Laurent","Caron",44.7467,637.1,181.9,323.8,21.0,3,13,"g"],["Timothée","Martin-Lavigne",44.7467,637.1,351.9,549.4,21.0,3,13,"d"],["Camille","Dumas",45.0133,642.9,178.1,328.8,21.1,3,14,"g"],["Antoine","Blanc",45.0133,642.9,396.2,536.9,21.1,3,14,"d"],["Alexandre","Coat",45.2467,642.6,176.2,331.9,21.2,3,15,"g"],["Augustin","Lefèvre",45.2467,642.6,380.0,548.8,21.2,3,15,"d"],["Goulven","Bouzid",45.48,641.0,175.0,333.1,21.3,3,16,"g"],["Camille","Martin",45.48,641.0,393.1,539.4,21.3,3,16,"d"],["Laurent","Philippe",45.7133,640.4,173.8,336.2,21.4,3,17,"g"],["Hervé","Le Berre",45.7133,640.4,391.2,541.2,21.4,3,17,"d"],["Anna","Roy",45.9467,639.6,201.2,298.1,21.5,3,18,"g"],["Mamadou","André",45.9467,639.6,381.9,548.1,21.5,3,18,"d"],["Goulven","Leroux",46.18,638.0,175.0,333.8,21.6,3,19,"g"],["Gabriel","Le Corre",46.18,638.0,383.1,546.9,21.6,3,19,"d"],["Sarah","Lefebvre",46.4133,637.5,177.2,330.0,21.7,3,20,"g"],["Pascal","Lopes",46.4133,637.5,401.2,534.4,21.7,3,20,"d"],["Céline","Fernandes",46.68,642.9,171.2,338.8,21.8,3,21,"g"],["Zoé","Lefèvre",46.68,642.9,408.1,528.8,21.8,3,21,"d"],["Joséphine","Le Roux",46.9133,642.3,171.9,338.1,21.9,3,22,"g"],["Clara","Morvan",46.9133,642.3,399.4,535.0,21.9,3,22,"d"],["Martine","Durand",47.1467,640.9,176.2,332.5,22.1,3,23,"g"],["Loïc","Tran",47.1467,640.9,423.8,516.2,22.1,3,23,"d"],["Zoé","Gauthier",47.38,639.9,186.9,318.1,22.2,3,24,"g"],["Aïssatou","Hervé",47.38,639.9,388.1,543.1,22.2,3,24,"d"],["Julia","Dupont-Aignan",47.6133,640.0,171.2,338.8,22.3,3,25,"g"],["Hervé","Legrand",47.6133,640.0,392.5,540.6,22.3,3,25,"d"],["Tom","Rousseau",47.8467,638.0,179.4,326.9,22.4,3,26,"g"],["Goulven","Diallo",47.8467,638.0,393.8,539.4,22.4,3,26,"d"],["Brigitte","Perrin",48.08,637.4,183.8,321.2,22.5,3,27,"g"],["Paul","Le Bihan",48.08,637.4,400.0,535.0,22.5,3,27,"d"],["Aurélien","Benoît",48.3467,643.0,176.9,331.2,22.6,3,28,"g"],["Sarah","Thomas",48.3467,643.0,393.8,539.4,22.6,3,28,"d"],["Diego","Martinez",48.58,643.3,177.5,330.0,22.7,3,29,"g"],["Capucine","Lucas",48.58,643.3,384.4,545.6,22.7,3,29,"d"],["Maël","Faure",48.8133,641.0,195.0,306.2,22.8,3,30,"g"],["Clara","Diallo",48.8133,641.0,411.6,526.2,22.8,3,30,"d"],["Sébastien","Chevalier",49.0467,640.5,171.2,339.4,22.9,3,31,"g"],["Brigitte","Rivière",49.0467,640.5,393.1,540.0,22.9,3,31,"d"],["Catherine","N'Diaye",49.28,639.9,171.2,338.8,23.1,3,32,"g"],["Solène","Henry",49.28,639.9,399.4,536.2,23.1,3,32,"d"],["Benoît","de Saint-Exupéry",49.5467,642.0,183.1,322.5,23.2,3,33,"g"],["Christine","Renard",49.5133,637.9,380.6,548.1,23.2,3,33,"d"],["Julia","Olivier",49.7467,636.9,191.9,311.2,23.3,3,34,"g"],["Léo","Moreau",49.7467,636.9,408.8,528.1,23.3,3,34,"d"],["Brigitte","Jaouen",49.98,636.6,178.1,329.4,23.4,3,35,"g"],["Céline","Blanc",49.98,636.6,405.0,530.6,23.4,3,35,"d"],["Gwenaël","Dos Santos",50.2467,642.0,170.6,339.4,23.5,3,36,"g"],["Sacha","Lefebvre",50.2467,642.0,387.5,543.8,23.5,3,36,"d"],["Noah","Fontaine",50.48,641.0,180.6,326.2,23.6,3,37,"g"],["Soizic","Thomas",50.48,641.0,392.5,540.6,23.6,3,37,"d"],["Baptiste","Roger",50.7133,641.3,180.0,327.5,23.7,3,38,"g"],["Louis","Yilmaz",50.7133,641.3,403.8,531.2,23.7,3,38,"d"],["Maxime","Noël",50.9467,639.0,186.9,317.5,23.8,3,39,"g"],["Laurent","Russo",50.9467,639.0,395.0,538.8,23.8,3,39,"d"],["Jean-Luc","David",51.18,638.0,175.0,333.1,23.9,3,40,"g"],["Romain","Duval",51.18,638.0,398.8,536.2,23.9,3,40,"d"],["Gabriel","Sánchez",51.4133,637.1,173.1,336.9,24.1,3,41,"g"],["Yves","Bonnet",51.4133,637.1,403.8,531.9,24.1,3,41,"d"],["Inès","Leroy",51.68,643.5,198.1,302.5,24.2,3,42,"g"],["Oskar","Le Guen",51.68,643.5,392.5,540.0,24.2,3,42,"d"],["Benoît","Pierre",51.9133,642.5,187.5,316.9,24.3,3,43,"g"],["Apolline","Gérard",51.9133,642.5,386.9,543.8,24.3,3,43,"d"],["Félix","Thomas",52.1467,641.5,185.6,319.4,24.4,3,44,"g"],["Lina","López",52.1467,641.5,415.0,523.8,24.4,3,44,"d"],["Sébastien","Boyer",52.38,640.3,173.1,337.5,24.5,3,45,"g"],["Siobhan","Vidal",52.38,640.3,397.5,536.2,24.5,3,45,"d"],["Tom","Nguyen",52.6133,639.6,187.5,315.0,24.6,3,46,"g"],["Goulven","Hervé",52.6133,639.6,391.2,541.2,24.6,3,46,"d"],["Olivier","Costa",52.8467,638.0,186.9,316.2,24.7,3,47,"g"],["Hannah","Rossi",52.8467,638.0,398.8,536.2,24.7,3,47,"d"],["Antoine","Blanchard",53.08,637.0,171.9,337.5,24.8,3,48,"g"],["Julien","Masson",53.08,637.0,393.1,539.4,24.8,3,48,"d"],["Adam","Cherif",53.3133,637.1,188.1,315.6,24.9,3,49,"g"],["Capucine","Meyer",53.3133,637.1,382.5,547.5,24.9,3,49,"d"],["Loïc","Haddad",53.58,642.0,188.8,314.4,25.0,3,50,"g"],["Léo","Schmitt",53.58,642.0,408.8,528.8,25.0,3,50,"d"],["Mathilde","Martinez",53.8133,641.0,171.9,352.8,25.2,3,51,"g"],["Alexandre","Morel",53.8133,641.0,381.9,546.9,25.2,3,51,"d"],["Leïla","Picard",54.0467,640.1,192.5,309.4,25.3,3,52,"g"],["Mathilde","Le Cam",54.0467,640.1,351.9,548.1,25.3,3,52,"d"],["Catherine","Yilmaz",54.28,640.3,171.2,338.8,25.4,3,53,"g"],["Hugo","Roger",54.28,640.3,408.8,528.8,25.4,3,53,"d"],["Jules","Arnaud",54.5133,638.1,185.0,318.1,25.5,3,54,"g"],["Ethan","Martinez",54.5133,638.1,390.0,541.9,25.5,3,54,"d"],["Nathan","Novak",54.7467,637.1,181.9,325.0,25.6,3,55,"g"],["Sarah","Guérin",54.7467,637.1,401.9,533.1,25.6,3,55,"d"],["Adam","Henry",54.98,637.2,188.8,315.0,25.7,3,56,"g"],["Mathilde","Prigent",54.98,637.2,382.5,548.1,25.7,3,56,"d"],["Léa","Martin",55.2467,642.0,196.9,303.8,25.8,3,57,"g"],["Lou","Simon",55.2467,642.0,416.2,521.9,25.8,3,57,"d"],["Baptiste","Robert",55.48,641.4,176.9,331.9,25.9,3,58,"g"],["Jean-Luc","Le Goff",55.48,641.4,381.2,548.1,25.9,3,58,"d"],["Nathalie","Leroy",55.7133,640.6,180.6,326.2,26.0,3,59,"g"],["Hannah","Duval",55.7133,640.6,396.9,536.9,26.0,3,59,"d"],["Lina","Moreau",55.9467,639.0,189.4,313.8,26.2,3,60,"g"],["Lina","Weber",55.9467,639.0,411.9,526.2,26.2,3,60,"d"],["Enzo","Rousseau",56.18,638.0,176.9,330.6,26.3,3,61,"g"],["Gérard","Muller",56.18,638.0,398.1,536.9,26.3,3,61,"d"],["Jean-Michel","Le Floch",56.4133,637.1,171.2,338.1,26.4,3,62,"g"],["Léa","Giraud",56.4133,637.1,415.0,523.1,26.4,3,62,"d"],["Marie-Hélène","Lefebvre",56.68,639.5,195.6,305.6,26.5,3,63,"g"],["Léa","Morvan",56.6467,639.2,408.8,528.1,26.5,3,63,"d"],["Mathis","Hamon",56.9133,642.5,180.6,346.6,26.6,3,64,"g"],["Marion","Philippe",56.9133,642.5,387.5,544.4,26.6,3,64,"d"],["Lukas","Michel",57.1467,640.9,185.6,318.1,26.7,3,65,"g"],["Martine","Simon",57.1467,640.9,393.8,539.4,26.7,3,65,"d"],["Mathilde","Bouzid",57.38,639.9,173.8,335.6,26.8,3,66,"g"],["Inès","Schneider",57.38,639.9,391.2,541.9,26.8,3,66,"d"],["Émilie","Morin",57.6133,638.5,189.4,313.1,26.9,3,67,"g"],["Hannah","Morel",57.6133,638.5,396.9,536.9,26.9,3,67,"d"],["Solène","David",57.8467,638.0,185.6,317.5,27.0,3,68,"g"],["Jean-Pierre","Vincent",57.8467,638.0,380.0,549.4,27.0,3,68,"d"],["Yann","Mercier",58.08,637.0,185.3,367.5,27.2,3,69,"g"],["Giulia","Lefèvre",58.08,637.0,397.5,536.2,27.2,3,69,"d"],["Jean-Luc","Prigent",58.3467,643.4,171.9,338.1,27.3,3,70,"g"],["Romain","Costa",58.3467,643.4,351.9,536.9,27.3,3,70,"d"]]};
-const VW = DATA.video.width, VH = DATA.video.height, FPS = DATA.video.fps, MAST = DATA.mast_m;
-const NAMES = DATA.names.map((r, i) => ({ i, p: r[0], n: r[1], t: r[2], y: r[3], x1: r[4], x2: r[5], h: r[6], b: r[7], row: r[8], col: r[9] }));
-const $ = id => document.getElementById(id);
-const app = $("app"), stage = $("stage"), v = $("v");
-const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+<!-- dialogues -->
+<div class="dlg" id="dlg" hidden><div class="dlg-box" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <div class="dlg-head"><h2 id="dlgTitle"></h2><button class="dlg-x" id="dlgClose" type="button" aria-label="Fermer">×</button></div>
+  <div id="dlgBody"></div>
+</div></div>
 
-/* ---------- recherche ---------- */
-const norm = s => (s || "").replace(/œ/g, "oe").replace(/Œ/g, "oe").replace(/æ/g, "ae").normalize("NFD")
-  .replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-const keyOf = e => norm(e.p + " " + e.n);
-const byKey = new Map();
-NAMES.forEach(e => { const k = keyOf(e); if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(e); });
-byKey.forEach(list => list.sort((a, b) => a.t - b.t).forEach((e, j) => { e.slug = keyOf(e).replace(/ /g, "-") + (j ? "-" + (j + 1) : ""); e.dup = list.length; e.rank = j + 1; }));
-const bySlug = new Map(NAMES.map(e => [e.slug, e]));
-
-function lev(a, b) {
-  const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
-  let prev = Array.from({ length: n + 1 }, (_, j) => j), cur = new Array(n + 1);
-  for (let i = 1; i <= m; i++) { cur[0] = i;
-    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    [prev, cur] = [cur, prev]; }
-  return prev[n];
-}
-function search(p, n) {
-  const q = norm(p + " " + n), q2 = norm(n + " " + p);
-  if (byKey.has(q)) return { hits: byKey.get(q) };
-  if (byKey.has(q2)) return { hits: byKey.get(q2) };
-  const sims = [];
-  byKey.forEach((list, k) => { const d = Math.min(lev(q, k), lev(q2, k)); const s = 1 - d / Math.max(q.length, k.length); if (s >= .78) sims.push([s, list[0]]); });
-  sims.sort((a, b) => b[0] - a[0]);
-  return { hits: [], close: sims.slice(0, 3).map(s => s[1]) };
-}
-
-/* ---------- hauteur de la caméra (m au-dessus du pont) ---------- */
-const TRACK = DATA.track;
-function heightAt(t) {
-  if (t <= TRACK[0][0]) return TRACK[0][1];
-  for (let i = 1; i < TRACK.length; i++) if (t <= TRACK[i][0]) {
-    const [t0, h0] = TRACK[i - 1], [t1, h1] = TRACK[i]; return h0 + (h1 - h0) * (t - t0) / (t1 - t0); }
-  return TRACK[TRACK.length - 1][1];
-}
-const fmtM = h => h.toFixed(1).replace(".", ",") + " m";
-const ALTI_MAX = Math.ceil(MAST + 1);
-(function buildAlti() {
-  const a = $("alti");
-  for (let m = 0; m <= ALTI_MAX; m++) {
-    const t = document.createElement("div"); t.className = "tick" + (m % 5 === 0 ? " big" : ""); t.style.bottom = (m / ALTI_MAX * 100) + "%"; a.appendChild(t);
-    if (m % 5 === 0) { const l = document.createElement("div"); l.className = "lab"; l.textContent = m + (m === 0 ? " m" : ""); l.style.bottom = (m / ALTI_MAX * 100) + "%"; a.appendChild(l); }
-  }
-})();
-function setAlti(h) {
-  $("altiCur").style.bottom = Math.min(100, h / ALTI_MAX * 100) + "%";
-  $("altiVal").textContent = fmtM(h);
-  if (app.dataset.state === "travel") $("climbH").innerHTML = fmtM(h) + '<span class="ad"> au-dessus du pont</span>';
-}
-
-/* ---------- son (Web Audio, piloté par la vitesse réelle du travelling) ---------- */
-const SND = { ctx: null, buf: {}, raw: {}, on: true, master: null, rope: null, ropeG: null, amb: null, ambG: null, sq: null, sqG: null };
-["rope_loop", "brake", "clack", "release", "whoosh", "ambience_loop"].forEach(n =>
-  fetch("audio/" + n + ".wav").then(r => r.arrayBuffer()).then(b => SND.raw[n] = b).catch(() => {}));
-function audioInit() {                       // appelé dans le gestionnaire du clic
-  try {
-    if (!SND.ctx) { SND.ctx = new (window.AudioContext || window.webkitAudioContext)(); SND.master = SND.ctx.createGain(); SND.master.connect(SND.ctx.destination); }
-    SND.ctx.resume && SND.ctx.resume();
-    SND.master.gain.value = SND.on ? 1 : 0;
-  } catch (e) { SND.ctx = null; }
-}
-async function decodeAll() {
-  if (!SND.ctx) return;
-  await Promise.all(Object.keys(SND.raw).map(async n => {
-    if (SND.buf[n]) return;
-    try { SND.buf[n] = await new Promise((res, rej) => SND.ctx.decodeAudioData(SND.raw[n].slice(0), res, rej)); } catch (e) {}
-  }));
-}
-function shot(name, gain = 1) {
-  if (!SND.ctx || !SND.buf[name]) return; const s = SND.ctx.createBufferSource(), g = SND.ctx.createGain();
-  s.buffer = SND.buf[name]; g.gain.value = gain; s.connect(g).connect(SND.master); s.start(); return { s, g };
-}
-function loop(name, gain) {
-  if (!SND.ctx || !SND.buf[name]) return [null, null]; const s = SND.ctx.createBufferSource(), g = SND.ctx.createGain();
-  s.buffer = SND.buf[name]; s.loop = true; g.gain.value = gain; s.connect(g).connect(SND.master); s.start(); return [s, g];
-}
-function ambienceOn() { if (SND.amb || !SND.ctx) return; [SND.amb, SND.ambG] = loop("ambience_loop", 0); if (SND.ambG) SND.ambG.gain.setTargetAtTime(.45, SND.ctx.currentTime, .4); }
-function ambienceOff() { if (!SND.amb) return; const s = SND.amb; SND.ambG.gain.setTargetAtTime(0, SND.ctx.currentTime, .3); setTimeout(() => { try { s.stop(); } catch (e) {} }, 1500); SND.amb = null; }
-function ropeOn() { if (SND.rope || !SND.ctx) return; [SND.rope, SND.ropeG] = loop("rope_loop", 0); }
-function ropeSpeed(rate) {
-  if (!SND.rope) return; const t = SND.ctx.currentTime;
-  SND.rope.playbackRate.setTargetAtTime(Math.min(1.9, .42 + .5 * rate), t, .05);
-  SND.ropeG.gain.setTargetAtTime(Math.min(1, rate / .5) * .5, t, .06);
-}
-function ropeOff() { if (!SND.rope) return; const s = SND.rope; SND.ropeG.gain.setTargetAtTime(0, SND.ctx.currentTime, .04); setTimeout(() => { try { s.stop(); } catch (e) {} }, 400); SND.rope = null; }
-function squealOn() { if (SND.sq) return; const o = shot("brake", .55); if (o) { SND.sq = o.s; SND.sqG = o.g; } }
-function squealOff() { if (!SND.sq) return; const s = SND.sq; SND.sqG.gain.setTargetAtTime(0, SND.ctx.currentTime, .05); setTimeout(() => { try { s.stop(); } catch (e) {} }, 400); SND.sq = null; }
-function allSoundOff() { ropeOff(); squealOff(); }
-$("sound").addEventListener("click", () => {
-  SND.on = !SND.on; $("sound").setAttribute("aria-pressed", SND.on);
-  if (SND.master) SND.master.gain.setTargetAtTime(SND.on ? 1 : 0, SND.ctx.currentTime, .05);
-  if (app.dataset.mode === "full") v.muted = !SND.on;
-});
-
-/* ---------- vidéo ---------- */
-function seek(t) {
-  return new Promise(res => {
-    let done = false; const fin = () => { if (done) return; done = true; v.removeEventListener("seeked", fin); res(); };
-    v.addEventListener("seeked", fin); v.currentTime = Math.max(0, Math.min(t, v.duration || t)); setTimeout(fin, 2500);
-  });
-}
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-const isMobile = () => matchMedia("(max-width: 860px)").matches;
-async function ensureReady() {
-  if (v.readyState >= 1) return;
-  await new Promise(res => {
-    const f = () => { v.removeEventListener("loadedmetadata", f); res(); };
-    v.addEventListener("loadedmetadata", f);
-    try { if (v.networkState === 0 || v.networkState === 3) v.load(); } catch (e) {}
-    setTimeout(res, 8000);
-  });
-}
-let lastRate = 1;
-function setRate(r) {                       // évite de modifier la vitesse à chaque image (saccades sur iPhone)
-  if (Math.abs(r - lastRate) / lastRate > 0.08 || r < 0.2) { try { v.playbackRate = r; } catch (e) {} lastRate = r; }
-}
-function primeVideo() {                     // à appeler pendant le geste de l'utilisateur
-  try { const p = v.play(); if (p && p.then) p.then(() => { if (app.dataset.mode !== "travel-run") v.pause(); }).catch(() => {}); } catch (e) {}
-}
-function placeSpot(e) {
-  const r = stage.getBoundingClientRect(), s = Math.max(r.width / VW, r.height / VH);
-  const ox = (r.width - VW * s) / 2, oy = (r.height - VH * s) / 2, pad = 10, hh = 25;
-  const sp = $("spot");
-  sp.style.left = (ox + (e.x1 - pad) * s) + "px"; sp.style.top = (oy + (e.y - hh) * s) + "px";
-  sp.style.width = ((e.x2 - e.x1 + 2 * pad) * s) + "px"; sp.style.height = (2 * hh * s) + "px";
-}
-let token = 0, current = null;
-const APPROACH = 4.0;     // secondes de vidéo parcourues pendant l'approche finale
-
-async function travel(e) {
-  const my = ++token; current = e;
-  app.dataset.mode = "travel"; v.muted = true; allSoundOff();
-  $("spot").classList.remove("show"); $("thanks").classList.remove("show"); $("msg").classList.remove("show");
-  $("altiTarget").style.bottom = Math.min(100, e.h / ALTI_MAX * 100) + "%"; $("alti").classList.add("armed");
-  setState("travel");
-  $("climbWho").textContent = e.p + " " + e.n;
-  if (isMobile()) await sleep(300);          // laisse le clavier se fermer et la mise en page se stabiliser
-  await Promise.all([decodeAll(), ensureReady()]); if (my !== token) return;
-  ambienceOn();
-
-  if (reduce) { await seek(e.t); setAlti(heightAt(e.t)); return arrive(e, my); }
-
-  // un seul glissement continu depuis le pied du mât : accélération douce, croisière, freinage progressif
-  const T = e.t;
-  const s0 = Math.min(DATA.t_motion || 1.2, Math.max(0, T - 0.05));
-  v.pause(); await seek(s0); if (my !== token) return;
-  stage.classList.add("travel");
-  shot("release", .8); ropeOn();
-  app.dataset.mode = "travel-run";
-  lastRate = 1; try { v.playbackRate = 1; } catch (err) {}
-  try { await v.play(); } catch (err) {}
-
-  const dist = Math.max(0.01, T - s0);                       // secondes de vidéo à parcourir
-  const vmax = Math.max(2.2, Math.min(isMobile() ? 6 : 8, dist / 5.5));
-  const ACC = 3.2, BRAKE = 1.6;
-  let sq = false, lastT = v.currentTime, lastMove = performance.now();
-  const tStart = performance.now();
-  await new Promise(res => { (function step() {
-    if (my !== token) return res();
-    const now = performance.now(), cur = v.currentTime;
-    if (cur !== lastT) { lastT = cur; lastMove = now; }
-    else if (now - lastMove > 1500) return res();          // vidéo bloquée : on saute directement au nom
-    const rem = T - cur;
-    if (rem <= 0.03 || v.ended || now - tStart > 20000) return res();
-    if (v.paused) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
-    const run = Math.max(0, cur - s0);
-    const rate = Math.max(.15, Math.min(Math.sqrt(1 + 2 * ACC * run), vmax, BRAKE * Math.pow(Math.max(rem, 0), .6)));
-    setRate(rate); ropeSpeed(rate); setAlti(heightAt(cur));
-    if (!sq && rem < 1.0) { sq = true; squealOn(); }
-    requestAnimationFrame(step); })(); });
-  if (my !== token) return;
-  v.pause(); app.dataset.mode = "travel"; ropeOff(); squealOff(); shot("clack", 1);
-  await seek(e.t); setAlti(heightAt(e.t));
-  stage.classList.remove("travel");
-  arrive(e, my);
-}
-function arrive(e, my) {
-  if (my !== token) return;
-  placeSpot(e); $("spot").classList.add("show");
-  $("tName").textContent = e.p + " !";
-  const where = $("tWhere"); where.innerHTML = "";
-  [["red", "Bande " + e.b], ["", "Ligne " + e.row + " · " + (e.col === "g" ? "à gauche" : "à droite")], ["", "N° " + (e.i + 1) + " sur " + NAMES.length]]
-    .forEach(([c, t]) => { const s = document.createElement("span"); s.className = "pill " + c; s.textContent = t; where.appendChild(s); });
-  $("spotTxt").textContent = "Vous êtes ici · " + fmtM(e.h);
-  renderFacts(e);
-  setTimeout(() => { if (my === token) { setState("done"); $("thanks").classList.add("show"); } }, reduce ? 0 : 650);
-  try { history.replaceState(null, "", "#" + e.slug); } catch (err) { location.hash = e.slug; }
-  setTimeout(() => { if (my === token && app.dataset.state === "done") ambienceOff(); }, 9000);
-}
-/* ---------- fiche technique du nom ---------- */
-const fmt1 = x => x.toFixed(1).replace(".", ",");
-const DYK = [
-  "Sur un IMOCA, le haut du mât ne doit pas dépasser 29 m au-dessus de l'eau : c'est le tirant d'air maximum fixé par la classe.",
-  "Depuis 2013, les IMOCA ont un mât monotype, identique pour tous. Ces mâts en carbone sont fabriqués à Lorient par Lorima.",
-  "Les mâts Lorima sont moulés d'une seule pièce. Le mât de secours préparé pour un Vendée Globe : un tube de 28,5 m pour seulement 240 kg.",
-  "Le mât d'un IMOCA n'est pas droit : il est incliné vers l'arrière de 2 à 6 degrés. Les marins appellent ça la quête.",
-];
-function renderFacts(e) {
-  const h = Math.max(e.h, 0.5);
-  const horizon = 3.57 * Math.sqrt(h);                  // km, par mer calme, depuis la hauteur du nom
-  const heel = h * Math.sin(20 * Math.PI / 180);         // décalage latéral à 20° de gîte
-  const floors = Math.max(1, Math.round(h / 3));
-  const tiles = [
-    ["Hauteur", fmt1(e.h), "m", "au-dessus du pont", true],
-    ["Horizon", "≈ " + Math.round(horizon), "km", "de mer visible depuis votre nom, par temps clair"],
-    ["À 20° de gîte", fmt1(heel), "m", "de décalage sur le côté quand le bateau penche"],
-    ["Comme un immeuble", floors, floors > 1 ? "étages" : "étage", "de haut, environ 3 m par étage"],
-  ];
-  const box = $("tFacts"); box.innerHTML = "";
-  tiles.forEach(([lab, val, unit, sub, gauge]) => {
-    const d = document.createElement("div"); d.className = "fact";
-    d.innerHTML = `<small>${lab}</small><b>${val}<u>${unit}</u></b><span>${sub}</span>` +
-      (gauge ? `<div class="gauge"><i style="bottom:${Math.min(100, e.h / 29 * 100)}%"></i></div>` : "");
-    box.appendChild(d);
-  });
-  const nb = [];
-  const mate = NAMES[e.i ^ 1], up = NAMES[e.i + 2], down = NAMES[e.i - 2];
-  if (mate && mate.b === e.b && mate.row === e.row) nb.push(`<strong>${esc(mate.p + " " + mate.n)}</strong> ${mate.col === "g" ? "à votre gauche" : "à votre droite"}`);
-  if (up && up.b === e.b) nb.push(`<strong>${esc(up.p + " " + up.n)}</strong> juste au-dessus`);
-  if (down && down.b === e.b) nb.push(`<strong>${esc(down.p + " " + down.n)}</strong> juste en dessous`);
-  $("tNeigh").innerHTML = nb.length ? "Vos voisins de mât : " + nb.join(", ") + "." : "";
-  $("tDyk").textContent = DYK[e.i % DYK.length];
-}
-function setState(s) { app.dataset.state = s; $("climb").classList.toggle("show", s === "travel"); if (s !== "done") $("thanks").classList.remove("show"); }
-
-/* ---------- interface ---------- */
-function showMsg(html, buttons) {
-  const m = $("msg"); m.innerHTML = ""; const p = document.createElement("p"); p.innerHTML = html; m.appendChild(p);
-  if (buttons && buttons.length) { const row = document.createElement("div"); row.className = "row";
-    buttons.forEach(([label, fn]) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = label; b.onclick = fn; row.appendChild(b); });
-    m.appendChild(row); }
-  m.classList.add("show");
-}
-const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-function go(e) {
-  audioInit(); primeVideo();
-  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  $("prenom").value = e.p; $("nom").value = e.n; $("playBig").classList.remove("show"); travel(e);
-}
-
-$("form").addEventListener("submit", ev => {
-  ev.preventDefault(); audioInit();
-  const p = $("prenom").value.trim(), n = $("nom").value.trim();
-  if (!p || !n) { showMsg("Saisissez votre <strong>prénom</strong> et votre <strong>nom</strong>, tels que vous les avez indiqués lors de votre don."); (p ? $("nom") : $("prenom")).focus(); return; }
-  const r = search(p, n);
-  if (r.hits.length === 1) return go(r.hits[0]);
-  if (r.hits.length > 1) return showMsg(`${r.hits.length} personnes s'appellent <strong>${esc(r.hits[0].p + " " + r.hits[0].n)}</strong> sur le mât. Laquelle êtes-vous ?`,
-    r.hits.map(e => [`Bande ${e.b} · ${fmtM(e.h)}`, () => go(e)]));
-  if (r.close.length) return showMsg(`Nous ne trouvons pas <strong>${esc(p + " " + n)}</strong>. Vouliez-vous dire :`, r.close.map(e => [e.p + " " + e.n, () => go(e)]));
-  showMsg(`Nous ne trouvons pas <strong>${esc(p + " " + n)}</strong> sur le mât. Vérifiez l'orthographe utilisée lors de votre don : les noms sont collés tels qu'ils ont été saisis.`);
-});
-$("replay").onclick = () => { if (current) { audioInit(); primeVideo(); travel(current); } };
-$("again").onclick = () => { token++; v.pause(); allSoundOff(); ambienceOff(); $("spot").classList.remove("show"); $("alti").classList.remove("armed");
-  setState("idle"); app.dataset.mode = ""; seek(0).then(() => setAlti(heightAt(0))); $("prenom").value = ""; $("nom").value = ""; $("prenom").focus();
-  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} };
-$("copy").onclick = async () => {
-  const b = $("copy"), url = location.href;
-  const text = current ? `Mon nom est sur le mât d'Initiatives-Cœur ! Retrouvez ${current.p} ${current.n} ici :` : "Retrouvez votre nom sur le mât d'Initiatives-Cœur :";
-  if (navigator.share) {
-    try { await navigator.share({ title: document.title, text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; }
-  }
-  try { await navigator.clipboard.writeText(url); b.textContent = "Lien copié"; } catch (e) { b.textContent = "Copie impossible"; }
-  setTimeout(() => b.textContent = "Partager", 2000);
-};
-$("full").onclick = async () => {
-  audioInit(); token++; allSoundOff(); ambienceOff(); $("spot").classList.remove("show");
-  app.dataset.mode = "full"; await seek(0); v.playbackRate = 1; v.muted = !SND.on; stage.classList.add("travel");
-  try { await v.play(); } catch (e) {}
-  const my = token; (function step() { if (my !== token || v.paused) { stage.classList.remove("travel"); return; } setAlti(heightAt(v.currentTime)); requestAnimationFrame(step); })();
-};
-v.addEventListener("ended", () => { if (app.dataset.mode === "full") { v.muted = true; stage.classList.remove("travel"); } });
-
-// exemples (noms fictifs de la démonstration)
-const EX = [NAMES.find(e => e.dup > 1), NAMES[Math.floor(NAMES.length * .55)], NAMES[NAMES.length - 3]].filter(Boolean);
-EX.forEach(e => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = e.p + " " + e.n;
-  b.onclick = () => { $("prenom").value = e.p; $("nom").value = e.n; $("form").requestSubmit(); }; $("examples").appendChild(b); });
-$("count").textContent = NAMES.length;
-
-// lien direct : #prenom-nom
-function fromHash() {
-  const e = bySlug.get(decodeURIComponent(location.hash.slice(1)));
-  if (!e) return;
-  $("prenom").value = e.p; $("nom").value = e.n; current = e;
-  const pb = $("playBig"); pb.textContent = "Voir " + e.p + " sur le mât ▸"; pb.classList.add("show"); pb.onclick = () => go(e);
-}
-addEventListener("hashchange", () => { if (app.dataset.state === "idle") fromHash(); });
-const replace = () => { if (current && $("spot").classList.contains("show")) placeSpot(current); };
-addEventListener("resize", replace);
-if (window.ResizeObserver) new ResizeObserver(replace).observe(stage);
-// si l'hébergeur refuse la lecture directe du fichier, on charge la vidéo en mémoire (blob:)
-let blobTried = false;
-v.addEventListener("error", () => {
-  if (blobTried) return; blobTried = true;
-  fetch("mast.mp4").then(r => r.blob()).then(b => { v.src = URL.createObjectURL(b); v.load(); }).catch(() => {});
-});
-if (v.error) v.dispatchEvent(new Event("error"));
-setAlti(heightAt(0)); fromHash();
-</script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
