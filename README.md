@@ -25,6 +25,8 @@ Le site est statique : il fonctionne tel quel sur GitHub Pages ou sur n'importe 
 - **Personnalités** : compléter `data/personnalites.json` (champ `lien` = son rapport avec Initiatives-Cœur). Photos : déposer les fichiers dans `personnalites/` (JPG d'environ 1 200 px, moins de 300 Ko), puis les lister dans `photos`, par exemple `[{"src": "personnalites/jamy-1.jpg", "credit": "Nom du photographe"}]`. Ne publier qu'avec l'accord de la personne.
 - **Contreparties et tirage** : `data/contreparties.json`.
 - **Prix, adresse de paiement, boutique** : `data/config.json`.
+- **Réseaux sociaux** : `url_publique` (l'adresse imprimée sur les images et vidéos), `hashtags` (mots-dièse ajoutés à la légende) dans `data/config.json`.
+- **Vidéo de bienvenue de Violette** : déposer le fichier (MP4 vertical, 20 à 30 s, moins de 15 Mo) dans `videos/`, puis renseigner `video_bienvenue`, par exemple `"videos/bienvenue-violette.mp4"`. Tant que le champ est vide, un emplacement réservé s'affiche.
 - **Soignants et familles d'accueil** : `data/soignants.json`, puis l'identifiant de chaque personne dans `equipe` de l'enfant (`data/enfants.json`).
 - **Photos des enfants** : déposer `enfants/<numéro>.jpg` (4/3, environ 800 px) et mettre `"photo_illustration": false`.
 
@@ -36,6 +38,11 @@ Le site est statique : il fonctionne tel quel sur GitHub Pages ou sur n'importe 
 - **Cartes** : carte du monde des enfants (photos à leur ville, trajet vers l'hôpital, zoom) ; carte des donateurs en France, du pays entier jusqu'à chaque donateur (regroupé autour de sa ville, jamais d'adresse).
 - **Survol** : vol de drone autour du bateau, puis retour sur le nom.
 - **Partage** : e-mail à une ou plusieurs personnes avec un texte modifiable (il part de la messagerie du donateur), SMS, WhatsApp, Facebook, LinkedIn.
+- **Images pour Instagram et Facebook** : publication 1080 × 1350, story 1080 × 1920, bannière 1200 × 630. Chaque image montre le nom encadré sur le mât (ou dans le cockpit), une vignette du bateau entier avec le point où il se trouve, l'enfant aidé et l'adresse de la campagne. Fabriquées dans le navigateur, sans serveur.
+- **Vidéo de 15 secondes (9:16)** : survol du bateau, montée jusqu'au nom avec le compteur de hauteur et les sons, arrêt sur le nom et l'enfant, carte de fin. Enregistrée en direct dans le navigateur : MP4 sur Safari et Chrome récents, WebM ailleurs.
+- **Partager** : sur téléphone, le menu de partage du téléphone (Instagram, Facebook, WhatsApp…) ; sur ordinateur, téléchargement du fichier. Une légende prête à coller est proposée, avec le lien personnel du donateur.
+- **Parrainage** : chaque donateur a son lien `…/?par=prenom-nom`. Le visiteur qui arrive par ce lien voit « X vous invite à embarquer », et son don est rattaché à X (`r` dans `data/donateurs.json`). La fiche de X affiche « a fait embarquer N noms ».
+- **Phrase-chaîne** : après le don, une phrase relie le donateur à ses voisins de mât, aux autres donateurs de son enfant et au nombre d'enfants financés par tous les noms du bateau.
 
 ## Brancher le système de dons d'Initiatives-Cœur
 
@@ -61,6 +68,8 @@ Règles de placement : en dessous de 15 €, le donateur reçoit la prochaine pl
 - **personnalités**, **paliers**, **participations au tirage**.
 
 Pistes suivantes : page personnelle privée de chaque donateur (lien envoyé par e-mail), collectes personnelles (anniversaire, course, entreprise) avec leur propre rangée, don mensuel « Équipage », compteur en direct.
+
+Pour le parrainage en production, la réservation envoie aussi `par` (le slug du parrain), conservé dans le navigateur du visiteur depuis son arrivée.
 
 ## Points à valider avant l'ouverture
 

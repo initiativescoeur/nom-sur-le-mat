@@ -15,6 +15,7 @@ const plural = (n, s, p) => nf(n) + ' ' + (n > 1 ? p : s);
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const lerp = (a, b, t) => a + (b - a) * t;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const REC = { on: false, draw: null, film: null };
 let landingSpin = false, dirty = true, spotSlot = -1, spotWhole = false, hoverSlot = -1, dragging = false;
 const getJSON = u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.json(); });
 const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
@@ -62,6 +63,9 @@ function reindex() {
   bySlug = new Map(D.map(o => [o.slug, o]));
 }
 reindex();
+const PAR_KEY = 'nom-sur-le-mat-par';
+let PAR = null;
+try { const q = new URLSearchParams(location.search).get('par'); if (q) localStorage.setItem(PAR_KEY, q); PAR = bySlug.get(q || localStorage.getItem(PAR_KEY) || '') || null; } catch (e) {}
 function lev(a, b) {
   const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
   let prev = Array.from({ length: n + 1 }, (_, j) => j), cur = new Array(n + 1);
@@ -441,6 +445,7 @@ function setRig(t) {
 }
 let lastH = 0;
 function resize() {
+  if (REC.on) return;
   const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); dirty = true;
   if (lastH && spotSlot >= 0 && !nav.auto && Math.abs(h - lastH) > 40) nav.td = closeD();   // le panneau a changé de taille : on garde le nom lisible
   lastH = h;
@@ -626,12 +631,12 @@ function frame(now) {
     ck.x += (ck.tx - ck.x) * k2; ck.y += (ck.ty - ck.y) * k2; ck.d += (ck.td - ck.d) * k2; if (Math.abs(ck.tx - ck.x) + Math.abs(ck.ty - ck.y) + Math.abs(ck.td - ck.d) > 1e-4) dirty = true; }
   const moving = Math.abs(nav.ts - nav.s) > 1e-4 || Math.abs(nav.tth - nav.th) > 1e-4 || Math.abs(nav.td / nav.d - 1) > 1e-4 || nav.auto;
   const t = (now - clock0) / 1000;
-  if (moving || dirty || now - lastRender > 45) {
+  if (moving || dirty || REC.film || now - lastRender > 45) {
     setRig(t); anemo.rotation.y = t * 9; seaMat.uniforms.time.value = t; seaMat.uniforms.flow.value = t * BOAT_SPEED;
     if (!window.__freeCam) placeCamera(); rig.updateMatrixWorld();
     camera.getWorldPosition(seaMat.uniforms.camPos.value);
     if (now - lastLOD > 120 || dirty) { updateLOD(); lastLOD = now; }
-    renderer.render(scene, camera); lastRender = now; dirty = false;
+    renderer.render(scene, camera); lastRender = now; dirty = false; if (REC.draw) REC.draw(now);
     updateOverlays();
   }
   requestAnimationFrame(frame);
@@ -738,8 +743,8 @@ function audioInit() {
         SND.ctx.resume && SND.ctx.resume(); SND.master.gain.value = SND.on ? 1 : 0; } catch (e) { SND.ctx = null; }
 }
 async function decodeAll() { if (!SND.ctx) return; await Promise.all(Object.keys(SND.raw).map(async n => { if (SND.buf[n]) return; try { SND.buf[n] = await new Promise((res, rej) => SND.ctx.decodeAudioData(SND.raw[n].slice(0), res, rej)); } catch (e) {} })); }
-function shot(n, g = 1) { if (!SND.ctx || !SND.buf[n]) return; const s = SND.ctx.createBufferSource(), gg = SND.ctx.createGain(); s.buffer = SND.buf[n]; gg.gain.value = g; s.connect(gg).connect(SND.master); s.start(); return { s, g: gg }; }
-function loopS(n, g) { if (!SND.ctx || !SND.buf[n]) return [null, null]; const s = SND.ctx.createBufferSource(), gg = SND.ctx.createGain(); s.buffer = SND.buf[n]; s.loop = true; gg.gain.value = g; s.connect(gg).connect(SND.master); s.start(); return [s, gg]; }
+function shot(n, g = 1) { if (!SND.ctx || !SND.buf[n]) return; const s = SND.ctx.createBufferSource(), gg = SND.ctx.createGain(); s.buffer = SND.buf[n]; gg.gain.value = g; s.connect(gg).connect(SND.master); if (SND.recBus) gg.connect(SND.recBus); s.start(); return { s, g: gg }; }
+function loopS(n, g) { if (!SND.ctx || !SND.buf[n]) return [null, null]; const s = SND.ctx.createBufferSource(), gg = SND.ctx.createGain(); s.buffer = SND.buf[n]; s.loop = true; gg.gain.value = g; s.connect(gg).connect(SND.master); if (SND.recBus) gg.connect(SND.recBus); s.start(); return [s, gg]; }
 function ropeOn() { if (SND.rope || !SND.ctx) return; [SND.rope, SND.ropeG] = loopS('rope_loop', 0); }
 function ropeSpeed(v) { if (!SND.rope) return; const t = SND.ctx.currentTime; SND.rope.playbackRate.setTargetAtTime(Math.min(1.9, .45 + .25 * v), t, .05); SND.ropeG.gain.setTargetAtTime(Math.min(1, v / 1.2) * .5, t, .06); }
 function ropeOff() { if (!SND.rope) return; const s = SND.rope; SND.ropeG.gain.setTargetAtTime(0, SND.ctx.currentTime, .04); setTimeout(() => { try { s.stop(); } catch (e) {} }, 400); SND.rope = null; }
@@ -977,7 +982,7 @@ function renderDone(o) {
     near.innerHTML = `<div><strong>${plural(sameV.length, 'autre donateur', 'autres donateurs')} ${esc(deVille(ville))}</strong>${sameV.length ? ' : ' + names(sameV) + (sameV.length > 14 ? '…' : '') : ''}</div>
       <div><strong>${plural(sameD.length, 'donateur', 'donateurs')} dans ${esc(dansDep(dep))}</strong></div>`;
   }
-  renderMyMap(o);
+  renderExtras(o); renderMyMap(o);
   $('tDyk').textContent = DYK[o.i % DYK.length];
 }
 function renderDoneCk(o) {
@@ -997,7 +1002,7 @@ function renderDoneCk(o) {
   $('tNeigh').innerHTML = nb.length ? 'Vos voisins dans le cockpit : ' + nb.join(', ') + '.' : '';
   const near = $('tNear'); near.innerHTML = '';
   if (o.v >= 0) { const sameV = D.filter(x => x.v === o.v && x !== o); near.innerHTML = `<div><strong>${plural(sameV.length, 'autre donateur', 'autres donateurs')} ${esc(deVille(VILLES[o.v]))}</strong>${sameV.length ? ' : ' + sameV.slice(0, 14).map(x => donLink(x)).join(', ') + (sameV.length > 14 ? '…' : '') : ''}</div>`; }
-  renderMyMap(o); $('tDyk').textContent = DYK[o.i % DYK.length];
+  renderExtras(o); renderMyMap(o); $('tDyk').textContent = DYK[o.i % DYK.length];
 }
 $('replay').onclick = () => current && travel(current, { fromFoot: true });
 $('myCard').onclick = () => current && openDonor(current);
@@ -1005,6 +1010,8 @@ $('shop').href = CFG.boutique_url || '#';
 $('again').onclick = () => { token++; spotSlot = -1; $('spot').classList.remove('show'); $('alti').classList.remove('armed'); setView('home'); $('prenom').value = ''; $('nom').value = ''; $('prenom').focus();
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} };
 $('copy').onclick = () => current ? openShare(current.local ? 'mine' : 'donor', current) : openShare('site');
+$('social').onclick = () => current && openSocial(current, current.perso < 0);
+$('social2').onclick = () => current && openSocial(current, current.perso < 0);
 
 /* =====================================================================  cartes (France, monde) */
 const CNT = VILLES.map(() => 0); D.forEach(o => { if (o.v >= 0) CNT[o.v]++; });
@@ -1213,7 +1220,7 @@ function shareTexts(kind, x) {
   const site = siteURL();
   if (kind === 'mine') { const o = x, k = o.e >= 0 ? ENF.enfants[o.e] : null, amt = o.amt ? ` de ${o.amt} €` : '';
     return { subject: 'Mon nom va faire le tour du monde avec Violette Dorange', short: `Mon nom est sur le bateau de Violette Dorange et j'aide à sauver un enfant ❤️ Toi aussi, dès 10 € :`,
-      body: `Bonjour,\n\nJe viens d'aider à sauver un enfant ! J'ai fait un don${amt} à Initiatives-Cœur pour Mécénat Chirurgie Cardiaque, et mon nom embarque sur le bateau de Violette Dorange : il va faire le tour du monde avec elle, jusqu'au Vendée Globe 2028.\n\n${k ? `Mon don aide ${k.prenom}, ${k.age} ans, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.\n\n` : ''}Toi aussi, tu peux mettre ton nom sur le bateau, dès 10 €, et aider un enfant : ${site}\n\nMon nom est ici : ${ficheURL(o)}\n\nÀ bientôt,\n${o.p}`, url: ficheURL(o) }; }
+      body: `Bonjour,\n\nJe viens d'aider à sauver un enfant ! J'ai fait un don${amt} à Initiatives-Cœur pour Mécénat Chirurgie Cardiaque, et mon nom embarque sur le bateau de Violette Dorange : il va faire le tour du monde avec elle, jusqu'au Vendée Globe 2028.\n\n${k ? `Mon don aide ${k.prenom}, ${k.age} ans, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.\n\n` : ''}Toi aussi, tu peux mettre ton nom sur le bateau, dès 10 €, et aider un enfant : ${refURL(o)}\n\nMon nom est ici : ${ficheURL(o)}\n\nÀ bientôt,\n${o.p}`, url: ficheURL(o) }; }
   if (kind === 'donor') { const o = x;
     return { subject: `${o.p} ${o.n} a son nom sur le bateau de Violette Dorange`, short: `${o.p} ${o.n} a son nom sur le bateau de Violette Dorange et aide à sauver un enfant ❤️`,
       body: `Bonjour,\n\nRegarde : ${o.p} ${o.n} a mis son nom sur le bateau de Violette Dorange pour aider Mécénat Chirurgie Cardiaque à faire opérer du cœur des enfants venus de loin.\n\nSa fiche : ${ficheURL(o)}\n\nToi aussi, dès 10 €, ton nom peut faire le tour du monde avec Violette : ${site}`, url: ficheURL(o) }; }
@@ -1226,6 +1233,7 @@ function shareTexts(kind, x) {
 function openShare(kind, x) {
   const T = shareTexts(kind, x), enc2 = encodeURIComponent;
   const html = `<div class="share">
+    ${kind === 'mine' || kind === 'donor' ? `<div class="shsoc"><span><b>Instagram, Facebook :</b> une image ou une vidéo de ${kind === 'mine' || x === current ? 'votre' : 'ce'} nom sur le bateau, prête à publier.</span><button class="btn red small" type="button" id="shSoc">Créer les visuels</button></div>` : ''}
     <p class="sub">Le texte est modifiable avant l'envoi.</p>
     <label>Destinataires <small>(une ou plusieurs adresses e-mail, séparées par des virgules — facultatif)</small><input id="shTo" type="email" multiple placeholder="claire@exemple.fr, marc@exemple.fr" autocomplete="off"></label>
     <label>Objet<input id="shSub" value="${esc(T.subject)}"></label>
@@ -1248,8 +1256,361 @@ function openShare(kind, x) {
       b.querySelector('#shWa').href = `https://wa.me/?text=${enc2(body.value)}`; };
     [to, sub, body].forEach(e => e.addEventListener('input', upd)); upd();
     const cp = b.querySelector('#shCopy'); cp.onclick = async () => { try { await navigator.clipboard.writeText(body.value); cp.textContent = 'Texte copié'; } catch (e) { body.select(); cp.textContent = 'Sélectionné : Ctrl/Cmd + C'; } };
+    const ss = b.querySelector('#shSoc'); if (ss) ss.onclick = () => openSocial(x, kind === 'mine' || x === current);
     const nt = b.querySelector('#shNative'); if (nt) nt.onclick = async () => { try { await navigator.share({ title: sub.value, text: body.value }); } catch (e) {} };
   });
+}
+
+/* =====================================================================  réseaux sociaux : image et vidéo prêtes à publier (Instagram, Facebook) */
+const PUB = () => (CFG.url_publique || siteURL()).split('#')[0].split('?')[0];
+const PUB_SHORT = () => PUB().replace(/^https?:\/\//, '').replace(/\/(index\.html)?$/, '');
+const refURL = o => PUB() + '?par=' + encodeURIComponent(o.slug);
+const IN_FRAME = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+const TAGS = () => CFG.hashtags || '#TonNomAutourDuMonde #InitiativesCoeur';
+const F_DISP = '"Big Shoulders Display", "Barlow Condensed", "Arial Narrow", sans-serif', F_BODY = '"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif';
+const C_ABYSSE = '#071629', C_HOULE = '#0f2742', C_COEUR = '#e5202e', C_ECUME = '#f4f1ea', C_BRUME = '#9fb3c9';
+const SOC_FMT = {
+  post: { w: 1080, h: 1350, nom: 'Publication', sub: 'Instagram · Facebook', file: 'publication' },
+  story: { w: 1080, h: 1920, nom: 'Story', sub: 'Instagram · Facebook', file: 'story' },
+  fb: { w: 1200, h: 630, nom: 'Bannière', sub: 'Facebook · LinkedIn', file: 'facebook' },
+};
+let fontsOK = null;
+const socFonts = () => fontsOK || (fontsOK = Promise.all(['900 80px "Big Shoulders Display"', '800 40px "Big Shoulders Display"', '700 30px "Atkinson Hyperlegible"', '400 30px "Atkinson Hyperlegible"', '600 30px "Barlow Condensed"']
+  .map(f => document.fonts ? document.fonts.load(f).catch(() => null) : null)));
+const imgCache = new Map();
+const loadImg = src => { if (!src) return Promise.resolve(null); if (!imgCache.has(src)) imgCache.set(src, new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; })); return imgCache.get(src); };
+const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+
+// rendu hors écran : la scène 3D est calculée à la taille voulue, puis l'écran reprend sa taille
+function recSize(w, h) {
+  const pr = renderer.getPixelRatio(), sz = renderer.getSize(new THREE.Vector2()), asp = camera.aspect;
+  REC.on = true; renderer.setPixelRatio(1); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  return () => { renderer.setPixelRatio(pr); renderer.setSize(sz.x, sz.y, false); camera.aspect = asp; camera.updateProjectionMatrix(); REC.on = false; resize(); dirty = true; };
+}
+function nameRect(o, w, h) {               // rectangle du nom dans une image w × h, vu par la caméra actuelle
+  rig.updateMatrixWorld(); camera.updateMatrixWorld(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  const pts = isCk(o) ? (q => [[q.u0, q.v0], [q.u1, q.v0], [q.u0, q.v1], [q.u1, q.v1]].map(([u, v]) => ckLocal(u, v)))(ckCellUV(o.ck)) : cellPoly(o.slot, o.perso >= 0).map(x => x.P);
+  for (const P of pts) { _v.copy(P).applyMatrix4(rig.matrixWorld).project(camera); if (_v.z > 1) return null;
+    const x = (_v.x + 1) / 2 * w, y = (1 - _v.y) / 2 * h; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  return { x0, y0, x1, y1 };
+}
+const tanFov = () => 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+const nameD = (o, rowFrac) => isCk(o) ? clamp(CK.h * ckRowPx() / ckCanvas.height / (rowFrac * tanFov()), 0.3, 2.4) : clamp(PITCH / (rowFrac * tanFov()), D_MIN, 3);
+function saveCam() { return { s: nav.s, th: nav.th, d: nav.d, ts: nav.ts, tth: nav.tth, td: nav.td, cy: nav.cy, el: nav.el, ck: ck.on, x: ck.x, y: ck.y, cd: ck.d, tx: ck.tx, ty: ck.ty, ctd: ck.td, ov: camOverride, sp: spotSlot, spw: spotWhole, spc: spotCk }; }
+function loadCam(v) { nav.s = v.s; nav.th = v.th; nav.d = v.d; nav.ts = v.ts; nav.tth = v.tth; nav.td = v.td; nav.cy = v.cy; nav.el = v.el; ck.on = v.ck;
+  ck.x = v.x; ck.y = v.y; ck.d = v.cd; ck.tx = v.tx; ck.ty = v.ty; ck.td = v.ctd; camOverride = v.ov; spotSlot = v.sp; spotWhole = v.spw; spotCk = v.spc; dirty = true; }
+function aimAt(o, rowFrac) {               // caméra posée face au nom
+  camOverride = null; nav.cy = nav.el = undefined;
+  if (isCk(o)) { const cc = ckCellCenter(o.ck); ck.on = true; ck.x = ck.tx = cc.x; ck.y = ck.ty = cc.y; ck.d = ck.td = nameD(o, rowFrac); }
+  else { const { f, row } = dec(o.slot); ck.on = false; nav.s = nav.ts = rowS(row); nav.th = nav.tth = f === 0 ? 0 : Math.PI; nav.d = nav.td = nameD(o, rowFrac); }
+}
+function snap3D(o, w, h, rowFrac) {        // une vue fixe du nom, à la taille w × h
+  const sv = saveCam(), restore = recSize(w, h), out = document.createElement('canvas'); out.width = w; out.height = h; let rect = null;
+  try {
+    aimAt(o, rowFrac); setRig((performance.now() - clock0) / 1000); placeCamera(); rig.updateMatrixWorld(true); camera.updateMatrixWorld();
+    camera.getWorldPosition(seaMat.uniforms.camPos.value); updateLOD(); renderer.render(scene, camera);
+    out.getContext('2d').drawImage(canvas, 0, 0, w, h); rect = nameRect(o, w, h);
+  } finally { loadCam(sv); restore(); updateLOD(); }
+  return { cv: out, rect };
+}
+
+function snapWide(o, w, h) {                // tout le bateau, de trois quarts, recadré serré, et le point où se trouve le nom
+  const RW = Math.round(w * 1.7), RH = Math.round(h * 1.7), sv = saveCam(), restore = recSize(RW, RH), out = document.createElement('canvas'); out.width = w; out.height = h; let pt = null;
+  try {
+    const thW = isCk(o) ? 2.35 : dec(o.slot).f === 0 ? 0.62 : Math.PI - 0.62;
+    camOverride = null; ck.on = false; nav.s = nav.ts = 13; nav.th = nav.tth = thW; nav.cy = 14; nav.el = 0.1; nav.d = nav.td = 46 / (tanFov() * Math.min(1, RW / RH / .75));
+    setRig((performance.now() - clock0) / 1000); placeCamera(); rig.updateMatrixWorld(true); camera.updateMatrixWorld();
+    camera.getWorldPosition(seaMat.uniforms.camPos.value); updateLOD(); renderer.render(scene, camera);
+    const bb = new THREE.Box3().setFromObject(boat); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (let i = 0; i < 8; i++) { _v.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z).project(camera);
+      const X = (_v.x + 1) / 2 * RW, Y = (1 - _v.y) / 2 * RH; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y); }
+    let cw = (x1 - x0) * 1.04, chh = (y1 - y0) * 1.04; if (cw / chh > w / h) chh = cw * h / w; else cw = chh * w / h;
+    cw = Math.min(cw, RW); chh = Math.min(chh, RH); const cx = clamp((x0 + x1) / 2 - cw / 2, 0, RW - cw), cy = clamp((y0 + y1) / 2 - chh / 2 + chh * .03, 0, RH - chh);
+    out.getContext('2d').drawImage(canvas, cx, cy, cw, chh, 0, 0, w, h);
+    const P = isCk(o) ? (q => ckLocal((q.u0 + q.u1) / 2, (q.v0 + q.v1) / 2))(ckCellUV(o.ck)) : cellPoly(o.slot, o.perso >= 0).reduce((a, x) => a.add(x.P), new THREE.Vector3()).multiplyScalar(1 / 4);
+    _v.copy(P).applyMatrix4(rig.matrixWorld).project(camera); if (_v.z < 1) pt = { x: ((_v.x + 1) / 2 * RW - cx) * w / cw, y: ((1 - _v.y) / 2 * RH - cy) * h / chh };
+  } finally { loadCam(sv); restore(); updateLOD(); }
+  return { cv: out, pt };
+}
+function boatInset(g, o, x, y, w, h, s) {          // vignette « où est mon nom sur le bateau »
+  const { cv, pt } = snapWide(o, Math.round(w), Math.round(h));
+  g.save(); g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = 24 * s; g.fillStyle = C_ABYSSE; rrect(g, x, y, w, h, 18 * s); g.fill(); g.shadowBlur = 0;
+  g.save(); rrect(g, x, y, w, h, 18 * s); g.clip(); g.drawImage(cv, x, y, w, h);
+  const gr = g.createLinearGradient(0, y + h - 70 * s, 0, y + h); gr.addColorStop(0, 'rgba(7,22,41,0)'); gr.addColorStop(1, 'rgba(7,22,41,.85)'); g.fillStyle = gr; g.fillRect(x, y + h - 70 * s, w, 70 * s);
+  if (pt) { const px = x + pt.x, py = y + pt.y; g.fillStyle = 'rgba(229,32,46,.28)'; g.beginPath(); g.arc(px, py, 22 * s, 0, Math.PI * 2); g.fill();
+    g.fillStyle = C_COEUR; g.strokeStyle = '#fff'; g.lineWidth = 3.5 * s; g.beginPath(); g.arc(px, py, 10 * s, 0, Math.PI * 2); g.fill(); g.stroke(); }
+  g.fillStyle = '#fff'; setFont(g, 800, 24 * s, F_DISP); if (g.letterSpacing !== undefined) g.letterSpacing = 1.5 * s + 'px'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.fillText(isCk(o) ? 'DANS LE COCKPIT' : 'ICI, SUR LE MÂT', x + w / 2, y + h - 18 * s); if (g.letterSpacing !== undefined) g.letterSpacing = '0px'; g.restore();
+  g.lineWidth = 3 * s; g.strokeStyle = 'rgba(244,241,234,.9)'; rrect(g, x, y, w, h, 18 * s); g.stroke(); g.restore();
+}
+
+// textes communs aux images, à la vidéo et à la légende
+function socInfo(o, me) {
+  const k = o.e >= 0 ? ENF.enfants[o.e] : null, P = o.perso >= 0, inCk = isCk(o), full = `${o.p} ${o.n}`;
+  const h = inCk ? 0 : hOf(rowS(dec(o.slot).row));
+  const lieu = inCk ? 'dans le cockpit, sous les yeux de Violette' : `sur le mât, à ${fmtM(h)} au-dessus du pont`;
+  const tag = inCk ? 'COCKPIT' : fmtM(h).toUpperCase();
+  const kidLine = k ? `${me ? "Et j'aide à sauver" : 'Son don aide à sauver'} ${k.prenom}, ${k.age} ans, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.`
+    : P ? `${o.p} soutient Mécénat Chirurgie Cardiaque, qui fait opérer du cœur des enfants venus de loin.` : 'Chaque don aide Mécénat Chirurgie Cardiaque à faire opérer du cœur des enfants venus de loin.';
+  const head = me ? ['MON NOM FAIT', 'LE TOUR DU MONDE', 'AVEC VIOLETTE DORANGE'] : [full.toUpperCase(), P ? 'EST À BORD' : 'FAIT LE TOUR DU MONDE', 'AVEC VIOLETTE DORANGE'];
+  const url = me && !P ? refURL(o) : PUB();
+  const caption = (me ? `Mon nom va faire le tour du monde sur le bateau de Violette Dorange ⛵ ${lieu}.` : `${full} a son nom sur le bateau de Violette Dorange ⛵ ${lieu}.`)
+    + `\n${kidLine.replace(/\.$/, '')} ❤️\n\nToi aussi, dès 10 €, mets ton nom sur le bateau : ${url}\n\n${TAGS()}`;
+  return { k, P, inCk, full, h, tag, kidLine, head, url, caption };
+}
+
+// petits outils de dessin
+function setFont(g, w, px, fam) { g.font = `${w} ${Math.round(px)}px ${fam}`; }
+function fitPx(g, txt, w, fam, maxW, maxPx, minPx = 14) { let px = maxPx; setFont(g, w, px, fam); while (px > minPx && g.measureText(txt).width > maxW) { px -= 2; setFont(g, w, px, fam); } return px; }
+function wrap(g, txt, maxW) { const out = []; let cur = ''; for (const w of txt.split(' ')) { const t = cur ? cur + ' ' + w : w; if (cur && g.measureText(t).width > maxW) { out.push(cur); cur = w; } else cur = t; } if (cur) out.push(cur); return out; }
+function rrect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function brand(g, x, y, px, col = '#fff', chip = false) {          // ♥ INITIATIVES-CŒUR × MÉCÉNAT CHIRURGIE CARDIAQUE
+  g.save();
+  if (chip) { const ls = g.letterSpacing !== undefined; if (ls) g.letterSpacing = px * .08 + 'px'; setFont(g, 800, px, F_DISP); const a = g.measureText('INITIATIVES-CŒUR').width;
+    setFont(g, 700, px * .62, F_DISP); const b = g.measureText('× MÉCÉNAT CHIRURGIE CARDIAQUE').width; if (ls) g.letterSpacing = '0px';
+    g.fillStyle = 'rgba(7,22,41,.82)'; rrect(g, x - px * .45, y - px * 1.2, px * 1.25 + Math.max(a, b) + px * .9, px * 2.35, px * .5); g.fill(); }
+  g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = px * .4; g.fillStyle = C_COEUR; heartPath(g, x + px * .5, y - px * .34, px * .95); g.fill();
+  g.fillStyle = col; setFont(g, 800, px, F_DISP); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  const t1 = 'INITIATIVES-CŒUR'; if (g.letterSpacing !== undefined) g.letterSpacing = px * .08 + 'px'; g.fillText(t1, x + px * 1.25, y);
+  const w1 = g.measureText(t1).width; setFont(g, 700, px * .62, F_DISP); g.globalAlpha = .9; g.fillText('× MÉCÉNAT CHIRURGIE CARDIAQUE', x + px * 1.25, y + px * .82);
+  if (g.letterSpacing !== undefined) g.letterSpacing = '0px'; g.restore(); return w1;
+}
+function namePin(g, r, txt, s, a = 1, maxX = g.canvas.width) {   // cadre rouge autour du nom + étiquette
+  if (!r) return; const pad = 7 * s, x = r.x0 - pad, y = r.y0 - pad, w = r.x1 - r.x0 + 2 * pad, h = r.y1 - r.y0 + 2 * pad;
+  g.save(); g.globalAlpha = a; g.beginPath(); g.rect(0, 0, maxX, g.canvas.height); g.clip(); g.shadowColor = 'rgba(229,32,46,.65)'; g.shadowBlur = 22 * s; g.lineWidth = 5 * s; g.strokeStyle = C_COEUR; rrect(g, x, y, w, h, 8 * s); g.stroke(); g.shadowBlur = 0;
+  setFont(g, 800, 30 * s, F_DISP); if (g.letterSpacing !== undefined) g.letterSpacing = 2 * s + 'px';
+  const tw = g.measureText(txt).width + 70 * s, th = 52 * s; let px = clamp((Math.max(r.x0, 0) + Math.min(r.x1, maxX)) / 2 - tw / 2, 16 * s, maxX - tw - 16 * s), py = y - th - 12 * s; if (py < 150 * s) py = y + h + 12 * s;
+  g.fillStyle = C_COEUR; rrect(g, px, py, tw, th, th / 2); g.fill(); g.fillStyle = '#fff'; heartPath(g, px + 28 * s, py + th * .47, 24 * s); g.fill();
+  g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillText(txt, px + 50 * s, py + th / 2 + 2 * s); if (g.letterSpacing !== undefined) g.letterSpacing = '0px'; g.restore();
+}
+function headline(g, x, y, lines, s, maxW, a = 1) {   // trois lignes : blanc, rouge, blanc
+  g.save(); g.globalAlpha = a; g.textBaseline = 'alphabetic'; g.textAlign = 'left'; let yy = y;
+  const sizes = [104, 104, 50].map(v => v * s);
+  lines.forEach((t, i) => { const px = fitPx(g, t, i < 2 ? 900 : 800, F_DISP, maxW, sizes[i], 20); g.fillStyle = i === 1 ? C_COEUR : '#fff'; yy += px * (i === 0 ? .82 : i === 1 ? .92 : 1.2); g.fillText(t, x, yy); });
+  g.restore(); return yy;
+}
+function kidRow(g, x, y, w, s, info, kidImg, a = 1) {  // pastille de l'enfant + phrase
+  g.save(); g.globalAlpha = a; const R = 58 * s; let tx = x;
+  if (info.k && kidImg) { g.save(); g.beginPath(); g.arc(x + R, y + R, R, 0, Math.PI * 2); g.clip(); const sc = Math.max(2 * R / kidImg.width, 2 * R / kidImg.height); g.drawImage(kidImg, x + R - kidImg.width * sc / 2, y + R - kidImg.height * sc * .42, kidImg.width * sc, kidImg.height * sc); g.restore();
+    g.lineWidth = 4 * s; g.strokeStyle = C_COEUR; g.beginPath(); g.arc(x + R, y + R, R, 0, Math.PI * 2); g.stroke(); tx = x + 2 * R + 26 * s; }
+  setFont(g, 400, 31 * s, F_BODY); g.fillStyle = C_ECUME; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  const lines = wrap(g, info.kidLine, x + w - tx); let yy = y + (info.k && kidImg ? R - (lines.length - 1) * 21 * s + 10 * s : 30 * s);
+  lines.forEach(l => { g.fillText(l, tx, yy); yy += 42 * s; }); g.restore(); return Math.max(y + 2 * R, yy - 30 * s);
+}
+function cta(g, x, y, w, s, info, a = 1) {           // « Toi aussi, dès 10 € » + adresse + mots-dièse
+  g.save(); g.globalAlpha = a; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  setFont(g, 900, 44 * s, F_DISP); g.fillStyle = C_COEUR; if (g.letterSpacing !== undefined) g.letterSpacing = 2 * s + 'px'; g.fillText('TOI AUSSI, DÈS 10 € :', x, y); if (g.letterSpacing !== undefined) g.letterSpacing = '0px';
+  const px = fitPx(g, PUB_SHORT(), 700, F_BODY, w, 32 * s, 14); g.fillStyle = '#fff'; g.fillText(PUB_SHORT(), x, y + px * 1.45);
+  setFont(g, 400, 24 * s, F_BODY); g.fillStyle = C_BRUME; g.fillText(TAGS(), x, y + px * 1.45 + 40 * s); g.restore();
+}
+
+// les trois formats d'image
+async function makeCard(fk, o, me) {
+  await socFonts(); const F = SOC_FMT[fk], info = socInfo(o, me), kidImg = info.k ? await loadImg(info.k.photo) : null;
+  const cv = document.createElement('canvas'); cv.width = F.w; cv.height = F.h; const g = cv.getContext('2d');
+  g.fillStyle = C_ABYSSE; g.fillRect(0, 0, F.w, F.h);
+  if (fk === 'fb') {                                   // bannière : bateau à gauche, texte à droite
+    const W3 = 560, { cv: v, rect } = snap3D(o, W3, F.h, isCk(o) ? 1 / 19 : 1 / 13); g.drawImage(v, 0, 0);
+    const gr = g.createLinearGradient(W3 - 140, 0, W3, 0); gr.addColorStop(0, 'rgba(7,22,41,0)'); gr.addColorStop(1, C_ABYSSE); g.fillStyle = gr; g.fillRect(W3 - 140, 0, 140, F.h);
+    namePin(g, rect, `${info.full.toUpperCase()} · ${info.tag}`, .78, 1, W3 - 30); boatInset(g, o, 22, F.h - 22 - 216, 162, 216, .62);
+    const s = .62, x = W3 + 34, w = F.w - x - 40; brand(g, x, 70, 30);
+    let y = headline(g, x, 118, info.head, s, w); y = kidRow(g, x, y + 26, w, .62, info, kidImg); cta(g, x, Math.max(y + 54, F.h - 92), w, .62, info);
+    return cv;
+  }
+  const story = fk === 'story', H3 = story ? 1180 : 860, s = 1;
+  const { cv: v, rect } = snap3D(o, F.w, H3, (story ? 1 / 18 : 1 / 14) * (isCk(o) ? .78 : 1)); g.drawImage(v, 0, 0);
+  const top = g.createLinearGradient(0, 0, 0, 260); top.addColorStop(0, 'rgba(7,22,41,.7)'); top.addColorStop(1, 'rgba(7,22,41,0)'); g.fillStyle = top; g.fillRect(0, 0, F.w, 260);
+  const gr = g.createLinearGradient(0, H3 - 280, 0, H3); gr.addColorStop(0, 'rgba(7,22,41,0)'); gr.addColorStop(1, C_ABYSSE); g.fillStyle = gr; g.fillRect(0, H3 - 280, F.w, 280);
+  namePin(g, rect, `${info.full.toUpperCase()} · ${info.tag}`, s);
+  brand(g, 52, story ? 250 : 92, 40, '#fff', true);
+  const iw = story ? 250 : 220, ih = Math.round(iw * 4 / 3); boatInset(g, o, F.w - 52 - iw, H3 - ih + (story ? 40 : 60), iw, ih, s);
+  const x = 52, w = F.w - 104; let y = headline(g, x, H3 - 70, info.head, s, w - iw - 30);
+  y = kidRow(g, x, y + 34, w, s, info, kidImg); cta(g, x, story ? Math.max(y + 80, 1560) : Math.max(y + 70, F.h - 150), w, s, info);
+  return cv;
+}
+
+// la vidéo : survol, montée vers le nom, arrêt sur le nom, carte de fin (format vertical 9:16)
+const FILM_MIMES = ['video/mp4;codecs=avc1.42E01F,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+const filmMime = () => window.MediaRecorder ? FILM_MIMES.find(m => MediaRecorder.isTypeSupported(m)) || '' : '';
+const canFilm = () => !!(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream);
+function drawFilm(F, t) {
+  const { g, W, H, o } = F, s = W / 1080, info = F.info;
+  g.drawImage(canvas, 0, 0, W, H);
+  const top = g.createLinearGradient(0, 0, 0, 300 * s); top.addColorStop(0, 'rgba(7,22,41,.65)'); top.addColorStop(1, 'rgba(7,22,41,0)'); g.fillStyle = top; g.fillRect(0, 0, W, 300 * s);
+  brand(g, 56 * s, 210 * s, 40 * s, '#fff', true);
+  const a1 = ease(t / 0.6) * (1 - ease((t - 2.7) / 0.5));
+  if (a1 > 0) { g.save(); g.globalAlpha = a1; const gb = g.createLinearGradient(0, H * .5, 0, H); gb.addColorStop(0, 'rgba(7,22,41,0)'); gb.addColorStop(.5, 'rgba(7,22,41,.8)'); gb.addColorStop(1, 'rgba(7,22,41,.92)'); g.fillStyle = gb; g.fillRect(0, H * .5, W, H * .5);
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 24 * s;
+    g.fillStyle = '#fff'; fitPx(g, F.me ? 'MON NOM' : info.full.toUpperCase(), 900, F_DISP, W - 100 * s, 130 * s); g.fillText(F.me ? 'MON NOM' : info.full.toUpperCase(), W / 2, H * .72);
+    g.fillStyle = C_COEUR; setFont(g, 900, 130 * s, F_DISP); g.fillText('EMBARQUE…', W / 2, H * .72 + 130 * s); g.restore(); }
+  if (!info.inCk && t > 3.1 && t < F.tArr + 0.4) {                // compteur de hauteur pendant la montée
+    const a = ease((t - 3.1) / 0.4) * (1 - ease((t - F.tArr) / 0.4)); g.save(); g.globalAlpha = a; g.textAlign = 'right';
+    g.fillStyle = 'rgba(7,22,41,.82)'; rrect(g, W - 456 * s, H * .86 - 124 * s, 400 * s, 192 * s, 24 * s); g.fill(); g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 18 * s;
+    g.fillStyle = '#fff'; setFont(g, 900, 120 * s, F_DISP); g.fillText(fmtM(hOf(nav.s)).toUpperCase(), W - 84 * s, H * .86); setFont(g, 700, 34 * s, F_DISP); g.fillStyle = C_ECUME; g.fillText('AU-DESSUS DU PONT', W - 84 * s, H * .86 + 46 * s); g.restore(); }
+  const a3 = ease((t - F.tArr) / 0.6) * (1 - ease((t - F.tEnd) / 0.4));
+  if (a3 > 0) {
+    namePin(g, nameRect(o, W, H), `${info.full.toUpperCase()} · ${info.tag}`, s, a3);
+    g.save(); g.globalAlpha = a3; const gr = g.createLinearGradient(0, H * .5, 0, H); gr.addColorStop(0, 'rgba(7,22,41,0)'); gr.addColorStop(.45, 'rgba(7,22,41,.85)'); gr.addColorStop(1, C_ABYSSE); g.fillStyle = gr; g.fillRect(0, H * .5, W, H * .5); g.restore();
+    const y = headline(g, 56 * s, H * .66, info.head, s, W - 112 * s, a3); kidRow(g, 56 * s, y + 30 * s, W - 112 * s, s, info, F.kidImg, ease((t - F.tArr - 0.6) / 0.6) * (1 - ease((t - F.tEnd) / 0.4)));
+  }
+  const a4 = ease((t - F.tEnd) / 0.6);
+  if (a4 > 0) { g.save(); g.globalAlpha = a4 * .95; g.fillStyle = C_ABYSSE; g.fillRect(0, 0, W, H); g.globalAlpha = a4; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    g.fillStyle = C_COEUR; heartPath(g, W / 2, H * .3, 150 * s); g.fill();
+    g.fillStyle = '#fff'; setFont(g, 900, 118 * s, F_DISP); g.fillText('TON NOM', W / 2, H * .44); g.fillStyle = C_COEUR; g.fillText('AUTOUR DU MONDE', W / 2, H * .44 + 116 * s);
+    g.fillStyle = '#fff'; setFont(g, 800, 46 * s, F_DISP); g.fillText('SUR LE BATEAU DE VIOLETTE DORANGE', W / 2, H * .44 + 196 * s);
+    setFont(g, 400, 34 * s, F_BODY); g.fillStyle = C_ECUME; g.fillText("Dès 10 €, et ton don aide à sauver un enfant.", W / 2, H * .44 + 268 * s);
+    const px = fitPx(g, PUB_SHORT(), 700, F_BODY, W - 100 * s, 38 * s); g.fillStyle = '#fff'; g.fillText(PUB_SHORT(), W / 2, H * .44 + 340 * s);
+    setFont(g, 400, 28 * s, F_BODY); g.fillStyle = C_BRUME; g.fillText(TAGS(), W / 2, H * .44 + 340 * s + px + 14 * s);
+    brand(g, W / 2 - 230 * s, H * .86, 40 * s); g.restore(); }
+}
+async function makeFilm(o, me, onFrame) {
+  if (!canFilm()) throw new Error('nosupport');
+  await socFonts(); const info = socInfo(o, me), kidImg = info.k ? await loadImg(info.k.photo) : null;
+  const W = 720, H = 1280, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d'); g.fillStyle = C_ABYSSE; g.fillRect(0, 0, W, H);
+  audioInit(); await decodeAll();
+  const stream = cv.captureStream(30); let dest = null;
+  if (SND.ctx) { dest = SND.ctx.createMediaStreamDestination(); SND.recBus = SND.ctx.createGain(); SND.recBus.connect(dest); dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr)); }
+  const mime = filmMime(), rec = new MediaRecorder(stream, Object.assign({ videoBitsPerSecond: 7e6 }, mime ? { mimeType: mime } : {}));
+  const chunks = []; rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); }; const stopped = new Promise(r => rec.onstop = r);
+  const sv = saveCam(); stopAuto(); landingSpin = false; const my = ++token; hideTip(); $('spot').classList.remove('show'); spotSlot = -1; spotCk = -1;
+  const restore = recSize(W, H), F = REC.film = { o, me, info, kidImg, g, W, H, t0: 0, tArr: 1e9, tEnd: 1e9 }, now = () => (performance.now() - F.t0) / 1000;
+  REC.draw = ts => { if (!F.t0) F.t0 = ts; const t = (ts - F.t0) / 1000; drawFilm(F, t); if (onFrame) onFrame(cv, t); };
+  let amb = null, ambG = null; [amb, ambG] = loopS('ambience_loop', 0); if (ambG) ambG.gain.setTargetAtTime(.32, SND.ctx.currentTime, .3);
+  const thT = isCk(o) ? 0 : dec(o.slot).f === 0 ? 0 : Math.PI, thW = isCk(o) ? 2.35 : dec(o.slot).f === 0 ? 0.55 : Math.PI - 0.55, WIDE = 42;
+  let ok = true;
+  try {
+    setCkMode(false); camOverride = null; nav.cy = 12; nav.el = -0.15; nav.auto = false; nav.s = nav.ts = 12; nav.th = nav.tth = thW - 0.45; nav.d = nav.td = WIDE * 1.15; dirty = true;
+    rec.start(200); await sleep(60); while (!F.t0 && my === token) await sleep(30);
+    ok = await flyKeys([[0, 12, thW - 0.45, WIDE * 1.15], [3.0, 12, thW, WIDE * 0.92]], my);
+    if (ok && isCk(o)) {
+      const cc = ckCellCenter(o.ck), d = nameD(o, 1 / 16), A = curPose(), P3 = new THREE.Vector3(), T3 = new THREE.Vector3(); ckPose(cc.x, cc.y, d, P3, T3);
+      setCkMode(true); ck.x = ck.tx = cc.x; ck.y = ck.ty = cc.y; ck.d = ck.td = d; shot('release', .6);
+      ok = await flyPath([A, { p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 2.4, -5), u: WUP.clone() }, { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.45, -4.4), u: WUP.clone() }, { p: P3, t: T3, u: WUP.clone() }], 5200, my);
+      if (ok) shot('clack', 1);
+    } else if (ok) {
+      const sT = rowS(dec(o.slot).row), dT = nameD(o, 1 / 16); shot('release', .7); ropeOn(); ropeSpeed(4);
+      const brake = setTimeout(() => { if (my === token) { shot('brake', .5); ropeSpeed(1); } }, 4300);
+      ok = await flyKeys([[0, nav.s, nav.th, nav.d], [2.4, lerp(nav.s, sT, 0.6), lerp(nav.th, thT, 0.7), 9], [5.2, sT, thT, dT]], my);
+      clearTimeout(brake); ropeOff(); if (ok) shot('clack', 1);
+    }
+    if (ok) { F.tArr = now(); await sleep(3800); }
+    if (ok && my === token) { F.tEnd = now(); await sleep(2900); }
+  } finally {
+    if (rec.state !== 'inactive') rec.stop(); await stopped;
+    try { if (amb) amb.stop(); } catch (e) {} ropeOff(); REC.draw = null; REC.film = null;
+    if (SND.recBus) { try { SND.recBus.disconnect(); } catch (e) {} SND.recBus = null; }
+    nav.auto = false; loadCam(sv); setCkMode(sv.ck); restore(); updateLOD();
+    if (sv.sp >= 0) $('spot').classList.add('show'); if (sv.spc >= 0 && sv.ck) $('spot').classList.add('show');
+  }
+  if (!ok || my !== token) return null;
+  const type = (rec.mimeType || mime || 'video/webm').split(';')[0];
+  return { blob: new Blob(chunks, { type }), type, ext: type.includes('mp4') ? 'mp4' : 'webm' };
+}
+
+// partage d'un fichier : menu du téléphone si possible, sinon téléchargement + texte copié
+async function shareFile(blob, name, text) {
+  const file = new File([blob], name, { type: blob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], text }); return 'shared'; } catch (e) { if (e && e.name === 'AbortError') return 'abort'; }
+  }
+  const a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 8000);
+  try { await navigator.clipboard.writeText(text); } catch (e) {}
+  return 'downloaded';
+}
+const toBlob = (cv, type = 'image/jpeg', q = .92) => new Promise(r => cv.toBlob(r, type, q));
+
+function openSocial(o, me) {
+  me = !!me && o.perso < 0; const info = socInfo(o, me);
+  const tabs = Object.entries(SOC_FMT).map(([id, f]) => `<button type="button" class="stab" data-f="${id}"><b>${f.nom}</b><small>${f.sub}</small></button>`).join('')
+    + `<button type="button" class="stab" data-f="video"><b>Vidéo</b><small>Story · Reel · 15 s</small></button>`;
+  const html = `<div class="soc">
+    <p class="sub">${me ? 'Vos visuels sont prêts : publiez-les sur Instagram ou Facebook pour embarquer vos proches.' : `Des visuels prêts à publier pour faire connaître la campagne.`}</p>
+    <div class="stabs">${tabs}</div>
+    <div class="sgrid"><div class="sprev" id="sPrev"></div>
+    <div class="sside">
+    ${IN_FRAME ? `<p class="sframe">Vous êtes dans un aperçu intégré : le téléchargement et le partage y sont bloqués. <a href="${esc(PUB() + '#' + o.slug)}" target="_blank" rel="noopener">Ouvrez la page publique</a> pour enregistrer les images et la vidéo.</p>` : ''}
+    <div class="sbtns"><button class="btn red" type="button" id="sShare">Partager…</button><button class="btn" type="button" id="sDl">Télécharger</button><button class="btn" type="button" id="sMake" hidden>Refaire la vidéo</button></div>
+    <p class="fine" id="sNote"></p>
+    <label class="slab">Texte à coller en légende <small>(modifiable)</small><textarea id="sTxt" rows="7">${esc(info.caption)}</textarea></label>
+    <div class="sbtns"><button class="btn" type="button" id="sCopy">Copier le texte</button></div>
+    <p class="fine">Sur téléphone, « Partager » ouvre le menu de votre téléphone : choisissez Instagram ou Facebook. Instagram ne reprend pas le texte : copiez-le d'abord, puis collez-le en légende. Sur ordinateur, le fichier est téléchargé et le texte copié.</p>
+    </div></div>
+  </div>`;
+  openDlg(me ? 'Partager sur les réseaux' : `Partager : ${o.p} ${o.n}`, html, b => {
+    const prev = b.querySelector('#sPrev'), note = b.querySelector('#sNote'), txt = b.querySelector('#sTxt'), bShare = b.querySelector('#sShare'), bDl = b.querySelector('#sDl'), bMake = b.querySelector('#sMake');
+    const cache = {}; let cur = 'post', busy = false;
+    const fname = (fk, ext) => `mon-nom-sur-le-bateau-${o.slug}-${fk === 'video' ? 'video' : SOC_FMT[fk].file}.${ext}`;
+    const setBusy = v => { busy = v; b.querySelectorAll('.stab').forEach(x => x.disabled = v); bShare.disabled = bDl.disabled = v; bMake.disabled = v; };
+    const show = async fk => {
+      cur = fk; b.querySelectorAll('.stab').forEach(x => x.classList.toggle('on', x.dataset.f === fk)); note.textContent = ''; bMake.hidden = true;
+      if (fk === 'video') {
+        if (cache.video) { prev.innerHTML = ''; const v = document.createElement('video'); v.src = cache.video.url; v.controls = true; v.playsInline = true; v.loop = true; prev.append(v); bMake.hidden = false;
+          note.textContent = cache.video.ext === 'mp4' ? 'Vidéo MP4 verticale, prête pour une story ou un reel.' : "Ce navigateur produit une vidéo WebM, qu'Instagram n'accepte pas toujours. Sur iPhone (Safari) ou avec un Chrome à jour, elle sort en MP4."; return; }
+        if (!canFilm()) { prev.innerHTML = '<p class="sload">Ce navigateur ne sait pas enregistrer de vidéo. Essayez avec Safari, Chrome ou Edge à jour.</p>'; return; }
+        prev.innerHTML = `<div class="sintro"><b>Votre film de 15 secondes</b><span>Survol du bateau, montée jusqu'à ${me ? 'votre' : 'ce'} nom, l'enfant aidé, puis l'adresse de la campagne. La vidéo se fabrique en direct : gardez cette fenêtre ouverte.</span><button class="btn red" type="button" id="sGo">Créer la vidéo</button></div>`;
+        prev.querySelector('#sGo').onclick = () => film(); return;
+      }
+      if (!cache[fk]) { prev.innerHTML = '<p class="sload">Préparation de l\'image…</p>'; setBusy(true);
+        try { await sleep(30); const cv = await makeCard(fk, o, me), blob = await toBlob(cv); cache[fk] = { blob, url: URL.createObjectURL(blob), ext: 'jpg' }; }
+        catch (e) { prev.innerHTML = '<p class="sload">L\'image n\'a pas pu être créée.</p>'; setBusy(false); return; } setBusy(false); if (cur !== fk) return; }
+      prev.innerHTML = ''; const im = document.createElement('img'); im.src = cache[fk].url; im.alt = `Aperçu : ${SOC_FMT[fk].nom}`; prev.append(im);
+      note.textContent = `${SOC_FMT[fk].nom} · ${SOC_FMT[fk].w} × ${SOC_FMT[fk].h} pixels`;
+    };
+    const film = async () => {
+      setBusy(true); prev.innerHTML = '<div class="slive"><canvas width="360" height="640"></canvas><div class="sbar"><i></i></div><small>Enregistrement en cours…</small></div>';
+      const lc = prev.querySelector('canvas'), lg = lc.getContext('2d'), bar = prev.querySelector('.sbar i'); let res = null;
+      try { res = await makeFilm(o, me, (cv, t) => { lg.drawImage(cv, 0, 0, lc.width, lc.height); bar.style.width = Math.min(100, t / 15 * 100) + '%'; }); }
+      catch (e) { res = null; }
+      setBusy(false);
+      if (!res) { prev.innerHTML = '<p class="sload">La vidéo a été interrompue. Réessayez en gardant cette fenêtre ouverte.</p>'; return; }
+      if (cache.video) URL.revokeObjectURL(cache.video.url); cache.video = { blob: res.blob, url: URL.createObjectURL(res.blob), ext: res.ext }; if (cur === 'video') show('video');
+    };
+    b.querySelectorAll('.stab').forEach(x => x.onclick = () => { if (!busy) show(x.dataset.f); });
+    bMake.onclick = () => { if (!busy) film(); };
+    const act = async dl => { const c = cache[cur]; if (!c) { if (cur === 'video') { note.textContent = "Créez d'abord la vidéo."; } return; }
+      const name = fname(cur, c.ext);
+      if (dl) { const a = document.createElement('a'); a.href = c.url; a.download = name; document.body.append(a); a.click(); a.remove(); note.textContent = 'Fichier téléchargé : publiez-le depuis Instagram ou Facebook.'; return; }
+      const r = await shareFile(c.blob, name, txt.value); if (r === 'downloaded') note.textContent = 'Fichier téléchargé et texte copié : publiez-le depuis Instagram ou Facebook, puis collez le texte en légende.'; };
+    bShare.onclick = () => act(false); bDl.onclick = () => act(true);
+    const cp = b.querySelector('#sCopy'); cp.onclick = async () => { try { await navigator.clipboard.writeText(txt.value); cp.textContent = 'Texte copié'; } catch (e) { txt.select(); cp.textContent = 'Sélectionné : Ctrl/Cmd + C'; } };
+    show('post');
+  }, true);
+}
+
+/* =====================================================================  parrainage : qui a fait embarquer qui */
+const filleuls = o => D.filter(x => x.r === o.i && x !== o);
+function refBlock(o) {
+  const fl = filleuls(o), names = fl.slice(0, 8).map(x => donLink(x, x.p + ' ' + x.n)).join(', ') + (fl.length > 8 ? ` et ${plural(fl.length - 8, 'autre', 'autres')}` : '');
+  return `<small>Embarquez vos proches</small>
+    <p>${fl.length ? `Grâce à vous, <strong>${plural(fl.length, 'nom a', 'noms ont')}</strong> déjà embarqué : ${names}.` : 'Partagez votre lien : chaque proche qui met son nom sur le bateau apparaîtra ici, et sur votre fiche.'}</p>
+    <div class="reflink"><code>${esc(refURL(o))}</code><button class="btn small" type="button" data-a="refcopy">Copier mon lien</button></div>`;
+}
+function bindRef(box, o) { const b = box.querySelector('[data-a=refcopy]'); if (b) b.onclick = async () => { try { await navigator.clipboard.writeText(refURL(o)); b.textContent = 'Lien copié'; } catch (e) { b.textContent = refURL(o); } }; }
+
+/* =====================================================================  phrase-chaîne : du nom à l'enfant */
+function chainText(o) {
+  if (o.perso >= 0) return '';
+  const k = o.e >= 0 ? ENF.enfants[o.e] : null; let a;
+  if (isCk(o)) { const n = ckOwner.filter(i => i >= 0 && i !== o.i).length; a = `Votre nom est dans le cockpit, avec ${plural(n, 'autre nom', 'autres noms')} sous les yeux de Violette.`; }
+  else { const { row } = dec(o.slot); let n = 0; for (const ff of [0, 1]) for (let c = 0; c < NC; c++) { const w = owner[enc(ff, row, c)]; if (w >= 0 && w !== o.i) n++; }
+    a = `Votre nom est au rang ${row} du mât, ${n ? `avec ${plural(n, 'autre nom', 'autres noms')} à la même hauteur` : 'seul à cette hauteur pour l\'instant'}.`; }
+  const de = k ? (VOY.test(k.prenom) ? "d'" : 'de ') : '';
+  const b = k ? ` Votre don rejoint ${k.donateurs > 1 ? `ceux de ${plural(k.donateurs - 1, 'autre donateur', 'autres donateurs')}` : 'les premiers dons'} pour l'opération ${de}<strong>${esc(k.prenom)}, ${k.age} ans</strong>.` : '';
+  const c = NKIDS_DONE ? ` Ensemble, les noms du bateau ont déjà financé <strong>${plural(NKIDS_DONE, 'enfant', 'enfants')}</strong>.` : '';
+  return a + b + c;
+}
+
+/* =====================================================================  un mot de Violette (vidéo de bienvenue après le don) */
+function welcomeBlock() {
+  const v = CFG.video_bienvenue;
+  return `<small>Un mot de Violette</small>` + (v ? `<video src="${esc(v)}" controls playsinline preload="metadata"></video>`
+    : `<div class="wph"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M10 8.5v7l6-3.5z"/></svg><span><b>Vidéo de bienvenue de Violette</b>Une vidéo de 20 à 30 secondes, tournée par Violette, accueillera ici chaque nouveau donateur. L'emplacement est prêt : il suffit d'ajouter la vidéo.</span></div>`);
+}
+function renderExtras(o) {
+  const ch = $('tChain'); ch.innerHTML = chainText(o); ch.hidden = !ch.innerHTML;
+  $('tSoc').hidden = o.perso >= 0;
+  const rb = $('tRef'); rb.hidden = o.perso >= 0; if (!rb.hidden) { rb.innerHTML = refBlock(o); bindRef(rb, o); }
+  const wb = $('tWelcome'); wb.hidden = !o.local; if (o.local) wb.innerHTML = welcomeBlock();
 }
 
 /* =====================================================================  équipes soignantes */
@@ -1411,12 +1772,14 @@ function openDonor(o) {
     ${inCk ? `<div class="place"><small>Sa place dans le cockpit</small><b>${ckLabel(o.ck)}</b><span>sous les yeux de Violette, pendant toutes ses courses</span></div>`
       : `<div class="place"><small>Sa place sur le mât</small><b>${slotLabel(o.slot)}</b><span>${fmtM(h)} au-dessus du pont</span></div>`}
     ${k ? `<div class="kid"><small>Son don participe à sauver</small>${kidCard(k, true)}</div>` : ''}
+    ${filleuls(o).length ? `<p class="refline">A fait embarquer <strong>${plural(filleuls(o).length, 'nom', 'noms')}</strong> : ${filleuls(o).slice(0, 10).map(x => donLink(x, x.p + ' ' + x.n)).join(', ')}${filleuls(o).length > 10 ? '…' : ''}.</p>` : ''}
     <div class="actions">
       <button class="btn primary" type="button" data-a="mat">${inCk ? 'Voir dans le cockpit' : 'Voir sur le mât'}</button>
       ${k ? `<button class="btn" type="button" data-a="kid">L'enfant aidé : ${esc(k.prenom)}</button>` : ''}
       <button class="btn" type="button" data-a="map">${voisins ? `Carte des donateurs (${voisins + 1} ${esc(deVille(ville))})` : 'Carte des donateurs'}</button>
       <a class="btn" href="${esc(CFG.boutique_url || '#')}" target="_blank" rel="noopener">Boutique solidaire</a>
       <button class="btn" type="button" data-a="send">${o.local ? 'Partager mon don par e-mail' : 'Partager sa fiche'}</button>
+      <button class="btn" type="button" data-a="soc">Image et vidéo pour les réseaux</button>
       <button class="btn" type="button" data-a="share">Copier le lien de sa fiche</button>
     </div>
     <p class="fine">La fiche ne montre que ce que le donateur a accepté de rendre public. Jamais de montant ni d'adresse.</p></div>`;
@@ -1425,6 +1788,7 @@ function openDonor(o) {
     const kb = b.querySelector('[data-a=kid]'); if (kb) kb.onclick = () => openKid(k);
     b.querySelector('[data-a=map]').onclick = () => openMap(o);
     b.querySelector('[data-a=send]').onclick = () => openShare(o.local ? 'mine' : 'donor', o);
+    b.querySelector('[data-a=soc]').onclick = () => openSocial(o, !!o.local);
     const sb = b.querySelector('[data-a=share]');
     sb.onclick = async () => { const url = location.href.split('#')[0] + '#fiche-' + o.slug; try { await navigator.clipboard.writeText(url); sb.textContent = 'Lien copié'; } catch (e) { sb.textContent = url; } };
   });
@@ -1604,7 +1968,7 @@ $('pay').onclick = async () => {
   const vi = VILLES.findIndex(v => norm(v) === norm(DS.ville));
   const kid = ENF.enfants.findIndex(e => e.finance < 1);
   const pub = $('dPub').checked;
-  const o = { slot: sl, p: DS.p, n: DS.n, v: vi, pal: palierOf(DS.amt), m: DS.msg, perso: -1, d: new Date().toISOString().slice(0, 10), e: kid >= 0 ? kid : ENF.enfants.length - 1, local: true, amt: DS.amt, ck: inCk ? DS.ck : -1, i: D.length,
+  const o = { slot: sl, p: DS.p, n: DS.n, v: vi, pal: palierOf(DS.amt), m: DS.msg, perso: -1, d: new Date().toISOString().slice(0, 10), e: kid >= 0 ? kid : ENF.enfants.length - 1, local: true, amt: DS.amt, ck: inCk ? DS.ck : -1, i: D.length, r: PAR ? PAR.i : -1,
               b: pub ? $('dBio').value.trim() : '', ph: pub ? DS.photo || '' : '' };
   D.push(o); occupy(o); reindex();
   try { const saved = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); saved.push(o); localStorage.setItem(LOCAL_KEY, JSON.stringify(saved)); } catch (e) {}
@@ -1616,6 +1980,7 @@ $('pay').onclick = async () => {
 function renderLanding() {
   $('lStats').innerHTML = `<div><b>${nf(D.length)}</b><span>noms déjà à bord</span></div><div><b>${nf(ENF.anterieurs + NKIDS_DONE)}</b><span>enfants opérés avec Initiatives-Cœur</span></div><div><b>≈ 45 000 km</b><span>autour du monde au Vendée Globe</span></div>`;
   $('lExploreTxt').textContent = `les ${nf(D.length)} noms déjà à bord, les enfants qu'ils aident, la carte du monde`;
+  const li = $('lInvite'); if (PAR) { li.innerHTML = `<svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg><span><b>${esc(PAR.p)} ${esc(PAR.n)}</b> a mis son nom sur le bateau et vous invite à embarquer.</span>`; li.hidden = false; }
 }
 function showLanding() { closeDlg(); renderLanding(); setView('landing'); landingSpin = true; spotSlot = -1; $('spot').classList.remove('show'); $('alti').classList.remove('armed'); dirty = true; introLoop(); }
 function leaveLanding(to) { landingSpin = false; nav.cy = nav.el = undefined; stopAuto(); token++; spotSlot = -1; $('spot').classList.remove('show'); nav.tth = 0; nav.ts = 1.3; nav.td = D0; setView('home'); if (to) to(); }

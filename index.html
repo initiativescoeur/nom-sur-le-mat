@@ -49,6 +49,7 @@
         <div class="eyebrow">Initiatives-Cœur <span class="x">×</span> Mécénat Chirurgie Cardiaque</div>
         <h1 class="lh1">Ton nom <em>autour du monde</em></h1>
         <p class="lsub">sur le bateau de Violette Dorange</p>
+        <p class="invite" id="lInvite" hidden></p>
         <p class="lead">Dès <strong>10 €</strong>, ton prénom et ton nom embarquent sur l'IMOCA Initiatives-Cœur, sur le mât ou dans le cockpit, pour toutes ses courses jusqu'au Vendée Globe 2028. Et ton don aide à faire opérer du cœur un enfant venu de loin.</p>
       </div>
       <div class="lstats" id="lStats"></div>
@@ -94,15 +95,20 @@
     <div class="thanks v-done" id="thanks">
       <h2 class="merci"><b id="tMerci">Merci </b><span id="tName"></span></h2>
       <div class="where" id="tWhere"></div>
+      <p class="chain" id="tChain" hidden></p>
+      <div class="socpush" id="tSoc"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1"/></svg><span><b>Montrez-le à vos proches</b>Une image et une vidéo de votre nom sur le bateau, prêtes pour Instagram et Facebook.</span><button class="btn red small" id="social2" type="button">Créer mes visuels</button></div>
       <blockquote class="quote" id="tQuote" hidden></blockquote>
       <div class="pcard" id="tPerso" hidden></div>
       <div class="kid" id="tKid" hidden></div>
+      <div class="welcome" id="tWelcome" hidden></div>
+      <div class="refbox" id="tRef" hidden></div>
       <div class="facts" id="tFacts"></div>
       <p class="neigh" id="tNeigh"></p>
       <div class="near" id="tNear"></div>
       <div class="mapcard" id="tMap"><div class="mapsvg" id="tMapSvg"></div><p class="mapcap" id="tMapCap"></p></div>
       <div class="actions">
-        <button class="btn primary" id="replay" type="button">Rejouer la montée</button>
+        <button class="btn red" id="social" type="button">Partager sur Instagram et Facebook</button>
+        <button class="btn" id="replay" type="button">Rejouer la montée</button>
         <button class="btn" id="copy" type="button">Partager</button>
         <button class="btn" id="again" type="button">Chercher un autre nom</button>
         <button class="btn" id="myCard" type="button">Ma fiche publique</button>
