@@ -21,8 +21,8 @@ const getJSON = u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return 
 const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 const fdate = iso => { if (!iso) return ''; const [y, m, d] = iso.split('-').map(Number); return `${d} ${MOIS[m - 1]} ${y}`; };
 
-const [MAT, DON, PERS, CTP, CFG, GEO, ENF, WORLD, SOI] = await Promise.all(
-  ['mat', 'donateurs', 'personnalites', 'contreparties', 'config', 'geo', 'enfants', 'monde', 'soignants'].map(n => getJSON('data/' + n + '.json').catch(e => { if (n === 'soignants') return { soignants: [] }; throw e; })));
+const [MAT, DON, PERS, CTP, CFG, GEO, ENF, WORLD, SOI, VOYJ] = await Promise.all(
+  ['mat', 'donateurs', 'personnalites', 'contreparties', 'config', 'geo', 'enfants', 'monde', 'soignants', 'voyages'].map(n => getJSON('data/' + n + '.json').catch(e => { if (n === 'soignants') return { soignants: [] }; if (n === 'voyages') return { segments: [] }; throw e; })));
 const SOIG = new Map(SOI.soignants.filter(x => x.autorise !== false).map(x => [x.id, x]));
 // les fiches des personnalités peuvent être complétées sans reconstruire le site (data/personnalites.json + dossier personnalites/)
 
@@ -1099,7 +1099,7 @@ function renderDone(o) {
     near.innerHTML = `<div><strong>${plural(sameV.length, 'autre donateur', 'autres donateurs')} ${esc(deVille(ville))}</strong>${sameV.length ? ' : ' + names(sameV) + (sameV.length > 14 ? '…' : '') : ''}</div>
       <div><strong>${plural(sameD.length, 'donateur', 'donateurs')} dans ${esc(dansDep(dep))}</strong></div>`;
   }
-  renderExtras(o); renderMyMap(o);
+  renderExtras(o); renderMyMap(o); renderVoy(o, !P);
   $('tDyk').textContent = DYK[o.i % DYK.length];
 }
 function renderDoneCk(o) {
@@ -1118,7 +1118,7 @@ function renderDoneCk(o) {
   $('tNeigh').innerHTML = nb.length ? 'Tes voisins dans le cockpit : ' + nb.join(', ') + '.' : '';
   const near = $('tNear'); near.innerHTML = '';
   if (o.v >= 0) { const sameV = D.filter(x => x.v === o.v && x !== o); near.innerHTML = `<div><strong>${plural(sameV.length, 'autre donateur', 'autres donateurs')} ${esc(deVille(VILLES[o.v]))}</strong>${sameV.length ? ' : ' + sameV.slice(0, 14).map(x => donLink(x)).join(', ') + (sameV.length > 14 ? '…' : '') : ''}</div>`; }
-  renderExtras(o); renderMyMap(o); $('tDyk').textContent = DYK[o.i % DYK.length];
+  renderExtras(o); renderMyMap(o); renderVoy(o, true); $('tDyk').textContent = DYK[o.i % DYK.length];
 }
 $('replay').onclick = () => current && travel(current, { fromFoot: true });
 $('myCard').onclick = () => current && openDonor(current);
@@ -1326,6 +1326,192 @@ function openKidsMap(focus) {
   openDlg(focus ? `Sur la carte : ${focus.prenom}` : 'Les enfants sur la carte du monde', [sub, wrap, leg], null, true);
   requestAnimationFrame(fit);
 }
+
+/* =====================================================================  autocollants et voyages des noms (simulation) */
+// Les noms sont posés par autocollants : un autocollant part à l'impression quand toutes ses places ont un nom,
+// puis il est posé à la première escale. On sait donc quand chaque nom monte à bord et quels parcours il fait ensuite.
+// Programme et traces : data/voyages.json (simulés pour la démo). ?jour=AAAA-MM-JJ simule une autre date.
+const SROWS = CFG.autocollant_rangs || 40, BAND = CFG.autocollant_cockpit || 120, DAY = 864e5;
+const PRINT = (VOYJ.delai_impression_jours ?? 10) * DAY;
+const tOf = iso => Date.parse(iso + 'T12:00:00');
+const jourQ = new URLSearchParams(location.search).get('jour');
+const NOW = jourQ && /^\d{4}-\d{2}-\d{2}$/.test(jourQ) ? tOf(jourQ) : Date.now();
+const SEG = (VOYJ.segments || []).map(s => ({ ...s, t0: tOf(s.du), t1: tOf(s.au) })).sort((a, b) => a.t0 - b.t0);
+const isoOf = t => new Date(t).toISOString().slice(0, 10), fd = t => fdate(isoOf(t));
+const MOISL = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const fmonth = t => { const d = new Date(t); return `${MOISL[d.getMonth()]} ${d.getFullYear()}`; };
+function fRange(a, b) { const [y1, m1, d1] = a.split('-').map(Number), [y2, m2, d2] = b.split('-').map(Number);
+  if (a === b) return fdate(a); if (y1 === y2 && m1 === m2) return `${d1}–${d2} ${MOIS[m1 - 1]} ${y1}`; if (y1 === y2) return `${d1} ${MOIS[m1 - 1]} – ${d2} ${MOIS[m2 - 1]} ${y1}`; return `${fdate(a)} – ${fdate(b)}`; }
+const aLieu = l => /^Les /.test(l) ? 'aux ' + l.slice(4) : /^Le /.test(l) ? 'au ' + l.slice(3) : 'à ' + l;
+// découpage : mât = SROWS rangs × 3 places ; cockpit = bandes d'environ BAND places (lignes entières), du haut vers le bas de chaque portrait
+const STK = [], stkSlot = new Int16Array(NS).fill(-1), stkCk = new Int16Array(CK.n).fill(-1);
+for (const f of [0, 1]) Z.forEach((z, zi) => { for (let k = 0; k * SROWS < z.rows; k++) {
+  const r0 = z.first + k * SROWS, r1 = Math.min(z.first + z.rows, r0 + SROWS), st = { i: STK.length, n: STK.length + 1, kind: 'mat', f, zi, k, r0, r1, places: [] };
+  for (let r = r0; r < r1; r++) for (let c = 0; c < NC; c++) { const sl = enc(f, r, c); st.places.push(sl); stkSlot[sl] = st.i; }
+  STK.push(st); } });
+[0, 1].forEach(side => {
+  const idx = [...CKC.keys()].filter(i => CKC[i][0] === side).sort((a, b) => CKC[a][2] - CKC[b][2] || CKC[a][1] - CKC[b][1] || a - b);
+  const lines = []; idx.forEach(i => { const L = lines[lines.length - 1]; if (L && CKC[L[0]][2] === CKC[i][2]) L.push(i); else lines.push([i]); });
+  const bands = [[]]; lines.forEach(L => { bands[bands.length - 1].push(...L); if (bands[bands.length - 1].length >= BAND) bands.push([]); });
+  if (!bands[bands.length - 1].length) bands.pop(); if (bands.length > 1 && bands[bands.length - 1].length < BAND / 2) bands[bands.length - 2].push(...bands.pop());
+  bands.forEach((b, k) => { const st = { i: STK.length, n: STK.length + 1, kind: 'ck', side, k, nb: bands.length, places: b }; b.forEach(c => stkCk[c] = st.i); STK.push(st); });
+});
+const stkIdx = o => !o ? -1 : isCk(o) ? stkCk[o.ck] : o.slot >= 0 ? stkSlot[o.slot] : -1;
+const stkWhere = st => st.kind === 'ck' ? `cockpit, portrait de ${ckKid(st.places[0])}, bande ${st.k + 1} sur ${st.nb}`
+  : `mât, côté ${FACEN[st.f].toLowerCase()}, de ${fmt1(hOf(rowS(st.r0)))} à ${fmtM(hOf(rowS(st.r1 - 1)))}`;
+function poseAt(t) { for (const s of SEG) if (s.pose && s.t1 > t) return { t: Math.max(t, s.t0), seg: s }; return null; }
+// rythme de remplissage : celui de l'autocollant sur 45 jours, au moins une part du rythme général
+function globalRate() { const n = D.filter(o => o.d && tOf(o.d) > NOW - 45 * DAY && tOf(o.d) <= NOW).length, open = STK.filter(st => stkState(st, 1).taken < st.places.length).length || 1;
+  return Math.max(n / 45, 6) / open; }
+let GR = null;
+function stkState(st, light) {
+  const own = st.kind === 'ck' ? ckOwner : owner, who = new Set(); let taken = 0;
+  for (const p of st.places) { const i = own[p]; if (i >= 0) { taken++; who.add(i); } }
+  const cap = st.places.length, S = { cap, taken, left: cap - taken, who };
+  if (light) return S;
+  const ds = [...who].map(i => D[i].d).filter(Boolean).sort();
+  if (!S.left) S.done = tOf(ds[ds.length - 1] || isoOf(NOW));
+  else { const recent = ds.filter(x => tOf(x) > NOW - 45 * DAY && tOf(x) <= NOW).length; if (GR == null) GR = globalRate();
+    S.eta = NOW + S.left / Math.max(recent / 45, GR) * DAY; }
+  S.ready = (S.done ?? S.eta) + PRINT; S.pose = poseAt(S.ready); S.posed = !!S.pose && S.pose.t <= NOW;
+  return S;
+}
+const navSegs = () => SEG.filter(s => s.km > 0);
+function voyOf(o) {
+  const si = stkIdx(o); if (si < 0) return null;
+  const st = STK[si], S = stkState(st), tp = S.pose ? S.pose.t : Infinity, list = []; let done = 0, todo = 0, nDone = 0;
+  for (const s of navSegs()) {
+    const span = Math.max(1, s.t1 - s.t0), a = Math.max(s.t0, tp), kd = Math.min(s.t1, NOW) > a ? s.km * (Math.min(s.t1, NOW) - a) / span : 0;
+    const b = Math.max(s.t0, tp, NOW), kf = s.t1 > b ? s.km * (s.t1 - b) / span : 0;
+    const status = s.t1 <= tp ? (s.t0 >= NOW ? 'sans' : 'avant') : s.t0 >= NOW ? 'avenir' : s.t1 <= NOW ? 'fait' : 'encours';
+    done += kd; todo += kf; if (status === 'fait') nDone++; list.push({ s, kd, kf, status });
+  }
+  return { st, S, tp, done, todo, nDone, list };
+}
+// position du bateau à une date : au port, ou le long de la trace au prorata du temps
+function boatAt(t) {
+  const s = SEG.find(x => t >= x.t0 && t < x.t1) || (t < (SEG[0] || {}).t0 ? SEG[0] : SEG[SEG.length - 1]); if (!s) return null;
+  if (!s.trace || s.trace.length < 2) return { s, ll: s.xy || (s.trace && s.trace[0]) };
+  const f = clamp((t - s.t0) / Math.max(1, s.t1 - s.t0), 0, 1), tr = s.trace, cum = [0];
+  for (let i = 1; i < tr.length; i++) { let dl = tr[i][0] - tr[i - 1][0]; if (dl > 180) dl -= 360; if (dl < -180) dl += 360; cum.push(cum[i - 1] + Math.hypot(dl * Math.cos(tr[i][1] * Math.PI / 180), tr[i][1] - tr[i - 1][1])); }
+  const L = cum[cum.length - 1] * f; let i = 1; while (i < cum.length - 1 && cum[i] < L) i++;
+  const u = (L - cum[i - 1]) / Math.max(1e-9, cum[i] - cum[i - 1]); let lo1 = tr[i - 1][0], lo2 = tr[i][0]; if (lo2 - lo1 > 180) lo2 -= 360; if (lo2 - lo1 < -180) lo2 += 360;
+  return { s, ll: [lo1 + (lo2 - lo1) * u, tr[i - 1][1] + (tr[i][1] - tr[i - 1][1]) * u], moving: !s.pose || s.km > 0 };
+}
+function tracePath(tr) {           // coupe au passage de l'antiméridien
+  let d = '', prev = null;
+  for (const [lo, la] of tr) { const [x, y] = wproj(lo, la); d += (prev == null || Math.abs(lo - prev) > 180 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1); prev = lo; }
+  return d;
+}
+const kmTxt = k => (k >= 100 ? '≈ ' : '') + nf(k >= 1000 ? Math.round(k / 10) * 10 : k) + ' km';
+// une phrase sur l'état de l'autocollant
+function stkLine(st, S, me) {
+  if (S.posed) return `Posé le ${fd(S.pose.t)} ${aLieu(S.pose.seg.lieu)}.`;
+  if (!S.left) return `Complet depuis le ${fd(S.done)} : il est à l'impression. ${S.pose ? `Pose prévue le ${fd(S.pose.t)} ${aLieu(S.pose.seg.lieu)}.` : ''}`;
+  return `${nf(S.taken)} places sur ${nf(S.cap)} ont un nom : encore ${plural(S.left, 'nom', 'noms')} et il part à l'impression.` + (S.pose ? ` Au rythme actuel, pose vers ${fmonth(S.pose.t)} ${aLieu(S.pose.seg.lieu)}.` : '');
+}
+const nextTrips = V => V.list.filter(x => x.status === 'avenir' || x.status === 'encours');
+// bloc de l'écran « Merci » et de la fiche
+function voyBlock(o, me) {
+  const V = voyOf(o); if (!V) return '';
+  const { st, S } = V, nx = nextTrips(V).slice(0, 3).map(x => esc(x.s.titre)), Ton = me ? 'Ton' : 'Son', ton = me ? 'ton' : 'son';
+  const head = S.posed ? `<b>${nf(V.done)}<u>km</u></b><span>parcourus par ${ton} nom${V.nDone ? `, en ${plural(V.nDone, 'navigation', 'navigations')}` : ''}</span>`
+    : `<b>0<u>km</u></b><span>pour l'instant : ${ton} nom embarque à la pose de ${me ? 'ton' : 'son'} autocollant</span>`;
+  return `<div class="voy"><div class="voy-km">${head}</div>
+    <div class="voy-stk"><small>Autocollant n°${st.n} · ${esc(stkWhere(st))}</small><div class="bar"><i style="width:${(S.taken / S.cap * 100).toFixed(1)}%"></i></div><span>${stkLine(st, S, me)}</span></div>
+    ${nx.length ? `<p class="voy-next">${S.posed ? `Prochains voyages de ${ton} nom` : `${Ton} nom devrait ensuite faire`} : ${nx.join(', ')}${nextTrips(V).length > 3 ? '… jusqu\'au Vendée Globe' : ''}.</p>` : ''}
+    <div class="voy-act"><button class="btn small" type="button" data-voy="open">Le carnet de voyage de ${ton} nom</button>${S.left ? `<button class="btn small red" type="button" data-voy="share">${me ? 'Fais compléter ton autocollant' : 'Aider à compléter cet autocollant'}</button>` : ''}</div></div>`;
+}
+function bindVoy(box, o, me) {
+  const a = box.querySelector('[data-voy=open]'); if (a) a.onclick = () => openVoyage(o, me);
+  const b = box.querySelector('[data-voy=share]'); if (b) b.onclick = () => openShare(o.local ? 'mine' : 'donor', o);
+}
+function renderVoy(o, me) { const box = $('tVoy'); if (!box) return; box.innerHTML = voyBlock(o, me); box.hidden = !box.innerHTML; bindVoy(box, o, me); }
+// carte des parcours
+function voyMap(V, me) {
+  const wrap = document.createElement('div'); wrap.className = 'kmap vmap';
+  const svg = sv('svg', { role: 'img', 'aria-label': 'Carte des parcours du bateau' }); wrap.appendChild(svg);
+  const gC = sv('g', { class: 'countries' }, svg); for (const d of Object.values(WORLD.pays)) sv('path', { d, class: 'c' }, gC);
+  const gT = sv('g', {}, svg), segs = V ? V.list : navSegs().map(s => ({ s, status: s.t1 <= NOW ? 'avant' : s.t0 >= NOW ? 'avenir' : 'encours' }));
+  const order = { avant: 0, sans: 1, avenir: 2, fait: 3, encours: 4 }, P = new Map();
+  [...segs].sort((a, b) => order[a.status] - order[b.status]).forEach(x => { if (!x.s.trace) return;
+    const p = sv('path', { d: tracePath(x.s.trace), class: 'tr ' + x.status }, gT); sv('title', {}, p).textContent = `${x.s.titre} · ${fRange(x.s.du, x.s.au)} · ${kmTxt(x.s.km)}`; P.set(x.s.id, p); });
+  const marks = [], mark = (ll, cls, label) => { const [x, y] = wproj(ll[0], ll[1]), g = sv('g', { class: 'vm ' + cls }, svg); sv('circle', { r: 5 }, g);
+    if (label) { const t = sv('text', { x: 9, y: cls === 'pose' ? -6 : 14 }, g); t.textContent = label; } marks.push({ g, x, y }); return g; };
+  if (V && V.S.pose) { const s = V.S.pose.seg; mark(s.xy || s.trace[0], 'pose', V.S.posed ? (me ? 'Ton nom monte à bord' : 'Son nom monte à bord') : 'Pose prévue'); }
+  const B = boatAt(NOW); if (B && B.ll) mark(B.ll, 'boat' + (B.moving ? ' moving' : ''), 'Le bateau aujourd\'hui');
+  const Zm = panZoom(svg, WORLD.w, WORLD.h, 6, (vb, u) => marks.forEach(m => m.g.setAttribute('transform', `translate(${m.x},${m.y}) scale(${u})`)));
+  const bbox = list => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    list.forEach(s => (s.trace || [s.xy]).forEach(ll => { if (!ll) return; const [x, y] = wproj(ll[0], ll[1]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }));
+    return x0 < 1e9 ? [x0, y0, x1, y1] : [0, 0, WORLD.w, WORLD.h]; };
+  const fitList = (list, minW = 90) => { const [x0, y0, x1, y1] = bbox(list); Zm.fitBox(x0, y0, x1, y1, 1.25, minW); };
+  const upToOcean = list => { const out = []; for (const s of list) { if (s.km > 20000) break; out.push(s); if (s.km >= 3000 && out.length >= 2) break; } return out; };
+  const mine = () => { const l = V ? upToOcean(V.list.filter(x => x.status !== 'avant' && x.status !== 'sans').map(x => x.s)) : [];
+    return l.length ? l : upToOcean(navSegs().filter(s => s.t1 > NOW - 120 * DAY)); };
+  const ctr = document.createElement('div'); ctr.className = 'kctrl';
+  ctr.innerHTML = `<button type="button" data-z="in" aria-label="Zoomer">+</button><button type="button" data-z="out" aria-label="Dézoomer">−</button><button type="button" data-z="mine">${V ? (me ? 'Tes parcours' : 'Ses parcours') : 'En ce moment'}</button><button type="button" data-z="all">Jusqu'au Vendée Globe</button>`;
+  ctr.onclick = e => { const b = e.target.closest('button'); if (!b) return; const z = b.dataset.z;
+    if (z === 'in') Zm.zoomCenter(0.6); else if (z === 'out') Zm.zoomCenter(1.6); else if (z === 'mine') fitList(mine()); else Zm.fitBox(0, 0, WORLD.w, WORLD.h, 1, 0); };
+  wrap.appendChild(ctr);
+  const focus = id => { P.forEach((p, k) => p.classList.toggle('hl', k === id)); const s = SEG.find(x => x.id === id); if (s) fitList([s], 60); };
+  return { wrap, fit: () => fitList(mine()), focus };
+}
+function voyList(V, me) {
+  const ul = document.createElement('ol'); ul.className = 'voylist'; const ton = me ? 'ton' : 'son', Ton = me ? 'Ton' : 'Son';
+  const lab = { avant: `avant ${ton} nom`, sans: `avant la pose de ${ton} nom`, fait: `✓ ${ton} nom était à bord`, encours: `en cours · ${ton} nom est à bord`, avenir: `${ton} nom sera à bord` };
+  let poseDone = false; const items = [];
+  const poseLi = () => { const p = V.S.pose; if (!p) return; poseDone = true;
+    items.push(`<li class="pose"><span class="d">${V.S.posed ? fd(p.t) : 'vers ' + fmonth(p.t)}</span><b>${V.S.posed ? `${Ton} nom est posé sur le bateau` : `Pose prévue de ${ton} autocollant`}</b><span class="k">${esc(p.seg.lieu)}</span><em>autocollant n°${V.st.n}</em></li>`); };
+  V.list.forEach(x => { if (!poseDone && x.s.t0 >= V.tp) poseLi();
+    const k = x.status === 'encours' ? `${kmTxt(x.kd)} sur ${kmTxt(x.s.km)}` : kmTxt(x.s.km);
+    items.push(`<li class="${x.status}" data-seg="${esc(x.s.id)}" tabindex="0"><span class="d">${fRange(x.s.du, x.s.au)}</span><b>${esc(x.s.titre)}</b><span class="k">${esc(x.s.de)}${x.s.a && x.s.a !== x.s.de ? ' → ' + esc(x.s.a) : ''}${x.s.lieu && !x.s.de ? esc(x.s.lieu) : ''} · ${k}</span>
+      <em>${lab[x.status]}${x.s.t0 > NOW ? ' · prévisionnel' : ''}</em>${x.s.note ? `<small>${esc(x.s.note)}</small>` : ''}</li>`); });
+  if (!poseDone) poseLi();
+  const pre = V.list.filter(x => x.status === 'avant'), n = pre.length;
+  ul.innerHTML = items.join('');
+  if (n > 1) { const lis = [...ul.querySelectorAll('li.avant')], det = document.createElement('li'); det.className = 'pre';
+    det.innerHTML = `<details><summary>Avant ${ton} nom : ${plural(n, 'navigation', 'navigations')} du bateau cette saison (${kmTxt(pre.reduce((a, x) => a + x.s.km, 0))})</summary><ol class="voylist"></ol></details>`;
+    lis[0].before(det); lis.forEach(li => det.querySelector('ol').appendChild(li)); }
+  return ul;
+}
+const openVoyage = dlgNav(function (o, me) {
+  const V = voyOf(o); if (!V) return; const { st, S } = V, ton = me ? 'ton' : 'son', Ton = me ? 'Ton' : 'Son';
+  const head = document.createElement('div'); head.className = 'voyhead';
+  head.innerHTML = `<div class="voy-km big"><b>${nf(V.done)}<u>km</u></b><span>${S.posed ? `parcourus par ${me ? 'ton nom' : 'le nom de ' + esc(o.p + ' ' + o.n)} depuis le ${fd(S.pose.t)}` : `pour l'instant : ${me ? 'ton nom' : 'son nom'} n'est pas encore posé sur le bateau`}</span></div>
+    <div class="voy-km"><b>${nf(V.todo)}<u>km</u></b><span>encore prévus d'ici la fin du Vendée Globe ${S.pose && !S.posed ? `(si l'autocollant est posé vers ${fmonth(S.pose.t)})` : ''}</span></div>
+    <div class="voy-stk wide"><small>Autocollant n°${st.n} · ${esc(stkWhere(st))}</small><div class="bar"><i style="width:${(S.taken / S.cap * 100).toFixed(1)}%"></i></div><span>${stkLine(st, S, me)}</span>
+      <span class="how">Les noms partent à l'impression par autocollants de ${nf(S.cap)} places : un autocollant est imprimé dès que toutes ses places ont un nom, puis posé à la première escale du bateau. Les noms des autocollants pas encore posés sont déjà sur le bateau virtuel.</span>
+      <div class="voy-act">${S.left ? `<button class="btn small red" type="button" data-a="share">${me ? 'Fais compléter ton autocollant' : 'Aider à le compléter'}</button>` : ''}<button class="btn small" type="button" data-a="all">Tous les autocollants</button></div></div>`;
+  const M = voyMap(V, me), L = voyList(V, me);
+  const leg = document.createElement('div'); leg.className = 'klegend';
+  leg.innerHTML = `<span><i class="lg-tr fait"></i>${Ton} nom était à bord</span><span><i class="lg-tr avenir"></i>À venir, avec ${ton} nom</span><span><i class="lg-tr avant"></i>Sans ${ton} nom (avant sa pose)</span><span><i class="lg-dot" style="background:#fff"></i>Le bateau aujourd'hui</span>`;
+  const fine = document.createElement('p'); fine.className = 'fine'; fine.textContent = (VOYJ.note || '') + ' Touche un parcours de la liste pour le voir sur la carte.';
+  openDlg(me ? 'Le carnet de voyage de ton nom' : `Le carnet de voyage de ${o.p} ${o.n}`, [head, M.wrap, leg, L, fine], b => {
+    const sh = b.querySelector('[data-a=share]'); if (sh) sh.onclick = () => openShare(o.local ? 'mine' : 'donor', o);
+    b.querySelector('[data-a=all]').onclick = () => openStickers(st.i);
+    L.addEventListener('click', e => { const li = e.target.closest('li[data-seg]'); if (li) { L.querySelectorAll('li').forEach(x => x.classList.toggle('on', x === li)); M.focus(li.dataset.seg); M.wrap.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } });
+    L.addEventListener('keydown', e => { if (e.key === 'Enter') e.target.click(); });
+  }, true);
+  requestAnimationFrame(M.fit);
+});
+const openStickers = dlgNav(function (focusI = -1) {
+  const groups = [['Mât · côté bâbord', st => st.kind === 'mat' && st.f === 0], ['Mât · côté tribord', st => st.kind === 'mat' && st.f === 1]];
+  TYPO_KIDS.forEach((K, s) => { const e = ENF.enfants.find(x => x.num === K.num); groups.push([`Cockpit · portrait de ${e ? e.prenom : 'l\'enfant'}`, st => st.kind === 'ck' && st.side === s]); });
+  const all = STK.map(st => ({ st, S: stkState(st) })), nP = all.filter(x => x.S.posed).length, nC = all.filter(x => !x.S.left && !x.S.posed).length;
+  const card = ({ st, S }) => `<li class="${S.posed ? 'posed' : !S.left ? 'full' : ''}${st.i === focusI ? ' me' : ''}"><b>n°${st.n}</b><div class="bar"><i style="width:${(S.taken / S.cap * 100).toFixed(1)}%"></i></div>
+    <span>${S.posed ? `posé le ${fd(S.pose.t)}` : !S.left ? `à l'impression` : `${nf(S.taken)}/${nf(S.cap)}`}</span><small>${S.posed ? esc(S.pose.seg.lieu) : S.pose ? (S.left ? 'vers ' : 'pose le ') + (S.left ? fmonth(S.pose.t) : fd(S.pose.t)) : ''}</small></li>`;
+  const html = `<p class="sub">${plural(STK.length, 'autocollant', 'autocollants')} : ${plural(nP, 'déjà posé', 'déjà posés')}, ${plural(nC, 'à l\'impression', 'à l\'impression')}, les autres se remplissent. Un autocollant est imprimé dès que toutes ses places ont un nom, puis posé à la première escale du bateau.</p>`
+    + groups.map(([t, fn]) => `<h4 class="stkh">${esc(t)}</h4><ol class="stkgrid">${all.filter(x => fn(x.st)).map(card).join('')}</ol>`).join('')
+    + `<p class="fine">${esc(VOYJ.note || '')}</p>`;
+  openDlg('Les autocollants du bateau', html, b => { const me = b.querySelector('li.me'); if (me) requestAnimationFrame(() => me.scrollIntoView({ block: 'center' })); }, true);
+});
+// pour le choix de la place : l'autocollant de la place choisie, et la place libre qui embarque le plus tôt
+function stkPickLine(si) { if (si < 0) return ''; const st = STK[si], S = stkState(st, 1), left = S.left - 1;
+  return `<span class="stkpick">Autocollant n°${st.n} : ${nf(S.taken)}/${nf(S.cap)} places prises. ${left <= 0 ? 'Ton nom le complète : il part à l\'impression !' : `Il sera imprimé et posé sur le bateau dès qu'il aura ses ${nf(S.cap)} noms (encore ${plural(left, 'nom', 'noms')} après toi).`}</span>`; }
+function fastest(kind) { let best = -1, bl = 1e9;
+  STK.forEach(st => { if ((kind === 'ck') !== (st.kind === 'ck')) return; const S = stkState(st, 1); if (S.left > 0 && S.left < bl) { bl = S.left; best = st.i; } });
+  if (best < 0) return -1; const st = STK[best], own = st.kind === 'ck' ? ckOwner : owner; return st.places.find(p => own[p] < 0) ?? -1; }
+window.__voy = { STK, stkState, voyOf, openVoyage, openStickers, NOW };
 
 /* =====================================================================  partage (e-mail à plusieurs personnes, SMS, réseaux) */
 const siteURL = () => location.href.split('#')[0];
@@ -1882,11 +2068,12 @@ function openDonor(o) {
   const html = `<div class="dcard">
     <div class="top"><div class="avatar big" style="background:${PALCOL[o.pal] || '#2b5a87'}">${av}</div>
       <div><h3>${esc(o.p)} ${esc(o.n)}</h3><p>${ville ? esc(ville) + (dep ? ' · ' + esc(dep[1]) : '') : 'Ville non indiquée'}</p>
-      <div class="where">${pal ? `<span class="pill gold">${esc(pal.nom)}</span>` : ''}<span class="pill">À bord depuis le ${fdate(o.d)}</span>${o.local ? '<span class="pill red">Nouveau</span>' : ''}</div></div></div>
+      <div class="where">${pal ? `<span class="pill gold">${esc(pal.nom)}</span>` : ''}<span class="pill">Inscrit le ${fdate(o.d)}</span>${o.local ? '<span class="pill red">Nouveau</span>' : ''}</div></div></div>
     ${o.b ? `<p class="bio">${esc(o.b)}</p>` : ''}
     ${o.m ? `<blockquote class="quote">« ${esc(o.m)} »<small>${o.local ? 'En attente de validation' : 'Son message'}</small></blockquote>` : ''}
     ${inCk ? `<div class="place"><small>Sa place dans le cockpit</small><b>${ckLabel(o.ck)}</b><span>sous les yeux de Violette, pendant toutes ses courses</span></div>`
       : `<div class="place"><small>Sa place sur le mât</small><b>${slotLabel(o.slot)}</b><span>${fmtM(h)} au-dessus du pont</span></div>`}
+    <div class="voybox">${voyBlock(o, !!o.local)}</div>
     ${k ? `<div class="kid"><small>Son don participe à sauver</small>${kidCard(k, true)}</div>` : ''}
     ${filleuls(o).length ? `<p class="refline">A fait embarquer <strong>${plural(filleuls(o).length, 'nom', 'noms')}</strong> : ${filleuls(o).slice(0, 10).map(x => donLink(x, x.p + ' ' + x.n)).join(', ')}${filleuls(o).length > 10 ? '…' : ''}.</p>` : ''}
     <div class="actions">
@@ -1900,7 +2087,7 @@ function openDonor(o) {
     </div>
     <p class="fine">La fiche ne montre que ce que le donateur a accepté de rendre public. Jamais de montant ni d'adresse.</p></div>`;
   openDlg('Fiche donateur', html, b => {
-    b.querySelector('[data-a=mat]').onclick = () => { closeDlg(); travel(o); };
+    b.querySelector('[data-a=mat]').onclick = () => { closeDlg(); travel(o); }; bindVoy(b.querySelector('.voybox'), o, !!o.local);
     const kb = b.querySelector('[data-a=kid]'); if (kb) kb.onclick = () => openKid(k);
     b.querySelector('[data-a=map]').onclick = () => openMap(o);
     b.querySelector('[data-a=send]').onclick = () => openShare(o.local ? 'mine' : 'donor', o);
@@ -2011,29 +2198,29 @@ function renderPlace() {
   if (DS.zone === 'ck') {
     if (DS.ck >= 0 && ckOwner[DS.ck] >= 0) DS.ck = -1;
     const nbN = DS.ck >= 0 ? ckNeighbors(DS.ck).filter(([, w]) => w.startsWith('à ')).map(([i]) => D[i].p + ' ' + D[i].n) : [];
-    box.innerHTML = DS.ck >= 0 ? `<div class="place"><small>Ta place</small><b>${ckLabel(DS.ck)}</b><span>Ton nom dessine un morceau du portrait de ${esc(ckKid(DS.ck))}, sur la cloison du cockpit, sous les yeux de Violette${nbN.length ? ' · à côté de ' + esc(nbN.join(' et ')) : ''}</span></div>`
+    box.innerHTML = DS.ck >= 0 ? `<div class="place"><small>Ta place</small><b>${ckLabel(DS.ck)}</b><span>Ton nom dessine un morceau du portrait de ${esc(ckKid(DS.ck))}, sur la cloison du cockpit, sous les yeux de Violette${nbN.length ? ' · à côté de ' + esc(nbN.join(' et ')) : ''}</span>${stkPickLine(stkCk[DS.ck])}</div>`
       : `<div class="place"><small>Comme dans un avion</small><b>Touche une place libre</b><span>Les places du cockpit dessinent deux portraits d'enfants : chaque nom en est un morceau. Les cases vertes sont libres. Fais glisser pour passer d'un portrait à l'autre, zoome pour lire les noms.</span></div>`;
     q.innerHTML = ''; const frees = [...Array(CK.n).keys()].filter(c => ckOwner[c] < 0);
     const dist = (c, [fx, fy]) => { const q = CKC[c]; return Math.hypot((q[1] + q[3]) / 2 - fx, (q[2] + q[4]) / 2 - fy); };
     TYPO_KIDS.forEach((K, s) => { const e = ENF.enfants.find(x => x.num === K.num), f = ckFace(s), fr = frees.filter(c => CKC[c][0] === s);
       if (fr.length) q.append(chip(`Sur le visage de ${e ? e.prenom : 'l\'enfant'}`, 'blue', () => selectCk(fr.sort((a, b) => dist(a, f) - dist(b, f))[0]))); });
-    q.append( chip('Au hasard', 'blue', () => selectCk(frees[Math.floor(Math.random() * frees.length)])), chip('Plutôt le mât', 'perso', () => { DS.zone = 'mat'; DS.ck = -1; ckSel = -1; drawCk(); gotoStep(1); }));
+    q.append( chip('Embarquer au plus vite', 'blue', () => selectCk(fastest('ck'))), chip('Au hasard', 'blue', () => selectCk(frees[Math.floor(Math.random() * frees.length)])), chip('Plutôt le mât', 'perso', () => { DS.zone = 'mat'; DS.ck = -1; ckSel = -1; drawCk(); gotoStep(1); }));
     if (!ck.on) { const e = ckEntry(); enterCockpit(e.x, 0, e.d); }
     $('placeNext').disabled = DS.ck < 0; return;
   }
   if (DS.amt < CFG.prix_choix) {
     const sl = nextAuto(); DS.slot = sl; const { row } = dec(sl);
-    box.innerHTML = `<div class="place"><small>Place attribuée automatiquement</small><b>${slotLabel(sl)}</b><span>${fmtM(hOf(rowS(row)))} au-dessus du pont : la prochaine place libre en partant du pied du mât.</span></div>`;
+    box.innerHTML = `<div class="place"><small>Place attribuée automatiquement</small><b>${slotLabel(sl)}</b><span>${fmtM(hOf(rowS(row)))} au-dessus du pont : la prochaine place libre en partant du pied du mât.</span>${stkPickLine(stkSlot[sl])}</div>`;
     q.innerHTML = ''; q.append(chip(`Choisir ma place (dès ${CFG.prix_choix} €)`, 'perso', () => { DS.amt = CFG.prix_choix; DS.slot = -1; gotoStep(2); }));
     showSlot(sl, true); $('placeNext').disabled = false; return;
   }
   if (DS.slot >= 0 && owner[DS.slot] >= 0) DS.slot = -1;
   box.innerHTML = DS.slot >= 0 ? (() => { const { row } = dec(DS.slot); const nb = [0, 1, 2].filter(c => c !== dec(DS.slot).col).map(c => owner[enc(dec(DS.slot).f, row, c)]).filter(i => i >= 0).map(i => D[i].p + ' ' + D[i].n);
-      return `<div class="place"><small>Ta place</small><b>${slotLabel(DS.slot)}</b><span>${fmtM(hOf(rowS(row)))} au-dessus du pont${nb.length ? ' · à côté de ' + esc(nb.join(' et ')) : ''}</span></div>`; })()
+      return `<div class="place"><small>Ta place</small><b>${slotLabel(DS.slot)}</b><span>${fmtM(hOf(rowS(row)))} au-dessus du pont${nb.length ? ' · à côté de ' + esc(nb.join(' et ')) : ''}</span>${stkPickLine(stkSlot[DS.slot])}</div>`; })()
     : `<div class="place"><small>Comme dans un avion</small><b>Touche une place libre</b><span>Les cases vertes sont libres. Fais glisser pour monter, tourne pour passer de l'autre côté.</span></div>`;
   q.innerHTML = '';
   const freeNear = (s, f) => { let best = -1, bd = 1e9; for (let sl = 0; sl < NS; sl++) { if (owner[sl] >= 0) continue; const d = dec(sl); if (f != null && d.f !== f) continue; const dd = Math.abs(rowS(d.row) - s); if (dd < bd) { bd = dd; best = sl; } } return best; };
-  q.append(chip('Tout en haut', 'blue', () => selectSlot(freeNear(30))), chip('À mi-hauteur', 'blue', () => selectSlot(freeNear(14.5 / MAT.A[1]))),
+  q.append(chip('Embarquer au plus vite', 'blue', () => selectSlot(fastest('mat'))), chip('Tout en haut', 'blue', () => selectSlot(freeNear(30))), chip('À mi-hauteur', 'blue', () => selectSlot(freeNear(14.5 / MAT.A[1]))),
     chip('Au hasard', 'blue', () => { let sl; do { sl = Math.floor(Math.random() * NS); } while (owner[sl] >= 0); selectSlot(sl); }));
   PERS.forEach((P, k) => { const o = D.find(x => x.perso === k); q.append(chip('Près de ' + esc(P.prenom + ' ' + P.nom), 'perso', () => selectSlot(freeNear(rowS(dec(o.slot).row), 0)))); });
   $('placeNext').disabled = DS.slot < 0;

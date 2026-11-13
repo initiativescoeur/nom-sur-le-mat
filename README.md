@@ -97,3 +97,15 @@ puis ouvrir http://localhost:8000.
 - **Vidéos du bord** : le site annonce que, pendant les courses, les noms peuvent apparaître dans les vidéos de Violette (accueil, choix mât ou cockpit, contreparties, fiche après le don).
 - **Places libres habillées** : sur le mât et dans le cockpit, les cases libres affichent des cœurs pâles, des portraits d'enfants et de courtes phrases, en attendant les noms.
 - **Personnalités** : bios complétées (à faire valider, surtout Constance Schaerer et Nouchka Simic), visuels génériques.
+
+## Autocollants et voyages des noms (simulés pour la démo)
+
+- **Les noms sont posés par autocollants.** Mât : 58 autocollants de 40 rangées × 3 places (120 noms ; les derniers de chaque zone sont plus petits). Cockpit : chaque portrait est imprimé en 10 bandes d'environ 120 places (autocollants n°59 à 78). Réglages : `autocollant_rangs` et `autocollant_cockpit` dans `data/config.json`.
+- **Règle** : un autocollant part à l'impression quand toutes ses places ont un nom ; il est posé à la première escale du bateau après le délai d'impression (`delai_impression_jours`, 10 jours dans `data/voyages.json`). Les escales où l'on peut poser sont marquées `pose: true`. Le nom est sur le bateau virtuel dès le don, sur le vrai bateau à la pose.
+- **Ce que voit le donateur** (écran « Merci », fiche donateur) : les kilomètres déjà parcourus par son nom, son autocollant (n°, emplacement, places prises, date de pose ou estimation au rythme des dons) et ses prochains voyages. Le bouton « Fais compléter ton autocollant » ouvre le partage : plus vite l'autocollant se remplit, plus tôt le nom embarque.
+- **Le carnet de voyage du nom** : carte des traces (en rouge les navigations faites avec le nom, en pointillé bleu celles à venir, en gris celles d'avant la pose), position du bateau à la date du jour, liste datée des navigations avec leurs distances. « Tous les autocollants » montre l'état des 78 autocollants.
+- **Choix de la place** : le site indique l'autocollant de la place choisie et combien de noms il lui manque ; « Embarquer au plus vite » propose une place sur l'autocollant le plus avancé.
+- **Programme et traces** : `data/voyages.json`, produit par `gen_voyages.py`. Les dates passées de 2026 suivent les faits publics (1000 Race, Vendée Arctique, Défi Azimut, village de Saint-Malo, départ de la Route du Rhum le 1er novembre, escale à Roscoff, retour à Lorient, abandon annoncé le 6 novembre) ; les traces et les distances sont simulées. Le programme 2027-2028 (Rolex Fastnet Race, Transat Café L'Or, The Transat CIC, New York Vendée, Vendée Globe) est prévisionnel et à corriger. À terme, les vraies traces viendront de la cartographie de course (GéoVoile) ou des données du bord.
+- **Démo** : `autocollants_demo.py` complète 9 autocollants et date leurs noms pour montrer des autocollants déjà posés (Lorient, village de Saint-Malo). À relancer après `cockpit_cells.py`. Ajouter `?jour=2027-11-01` à l'adresse pour voir le site à une autre date.
+- **À brancher** : la date de pose réelle de chaque autocollant (saisie par l'équipe au moment de la pose) doit remplacer l'estimation.
+
