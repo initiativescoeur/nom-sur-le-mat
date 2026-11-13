@@ -533,7 +533,7 @@ const ckHeadPx = () => ckCanvas.height * CK.head / CK.h;
    chaque nom dessine un morceau du visage (graisse et couleur suivent l'image) ; une place libre reste un trait pâle, le portrait
    devient plus net à chaque nom. Au centre, les emplacements réservés aux logos (Mécénat Chirurgie Cardiaque, partenaires). */
 const TYPO_KIDS = CK.portraits.map((p, i) => Object.assign({ num: p.num, area: p.area },
-  [{ pal: ['#2a2434', '#c6222e', '#fff4ec'], acc: '#c10f1c' }, { pal: ['#222c42', '#3c76d2', '#f4f8ff'], acc: '#1b4aa0' }][i % 2], { bg: '#0b1422' }));
+  [{ pal: ['#2b0306', '#b5141e', '#f7e6e4'], acc: '#c10f1c' }, { pal: ['#050d24', '#24529e', '#e3eaf6'], acc: '#1b4aa0' }][i % 2], { bg: '#ffffff' }));
 TYPO_KIDS.forEach(k => { k.img = new Image(); k.img.onload = () => { k.duo = null; try { drawCk(); } catch (e) {} }; k.img.src = `enfants/typo/${k.num}.png`; });
 Promise.all([300, 500, 800].map(w => new FontFace('Barlow Condensed', `url(fonts/barlow-condensed-latin-${w}-normal.woff2)`, { weight: String(w) }).load().then(f => document.fonts.add(f)).catch(() => {})))
   .then(() => { try { drawCk(); } catch (e) {} });
@@ -562,13 +562,13 @@ function drawCkHead(ctx, W, hp) {
 function kidDuo(kid, k) {                       // les tons du portrait (calculés hors ligne, cockpit_cells.py) → couleurs, à la taille de la zone
   if (kid.duo && kid.duo.k === k) return kid.duo.cv;
   const w = Math.ceil(kid.area[2] * k), h = Math.ceil(kid.area[3] * k), C = document.createElement('canvas'); C.width = w; C.height = h;
-  const c = C.getContext('2d'), [c0, c1, c2] = kid.pal.map(hex3); c.fillStyle = kid.pal[0]; c.fillRect(0, 0, w, h);
+  const c = C.getContext('2d'), [c0, c1, c2] = kid.pal.map(hex3), cb = hex3(kid.bg); c.fillStyle = kid.bg; c.fillRect(0, 0, w, h);
   const img = kid.img; if (!(img && img.complete && img.naturalWidth)) return C;
   const P = document.createElement('canvas'); P.width = img.naturalWidth; P.height = img.naturalHeight; const pc = P.getContext('2d', { willReadFrequently: true });
   pc.drawImage(img, 0, 0); const im = pc.getImageData(0, 0, P.width, P.height), a = im.data;
   for (let i = 0; i < a.length; i += 4) {
     const g0 = clamp((a[i] / 255 - 0.1) / 0.8, 0, 1), g = g0 * g0 * (3 - 2 * g0), A = a[i + 3] / 255, lo = g < 0.5, f = lo ? g / 0.5 : (g - 0.5) / 0.5, u = lo ? c0 : c1, v = lo ? c1 : c2;
-    for (let j = 0; j < 3; j++) a[i + j] = (u[j] + (v[j] - u[j]) * f) * A + c0[j] * (1 - A);
+    for (let j = 0; j < 3; j++) a[i + j] = (u[j] + (v[j] - u[j]) * f) * A + cb[j] * (1 - A);
     a[i + 3] = 255;
   }
   pc.putImageData(im, 0, 0); c.imageSmoothingQuality = 'high'; c.drawImage(P, 0, 0, w, h);
@@ -576,20 +576,20 @@ function kidDuo(kid, k) {                       // les tons du portrait (calcul�
 }
 function drawPortrait(ctx, kid, side, k) {      // chaque place est une case : le nom la remplit exactement (justifié), aucun mot n'en recouvre un autre
   const X = kid.area[0] * k, Y = kid.area[1] * k, w = Math.ceil(kid.area[2] * k), h = Math.ceil(kid.area[3] * k);
-  ctx.fillStyle = kid.bg; ctx.beginPath(); ctx.roundRect(X, Y, w, h, 22 * k); ctx.fill();
+  ctx.fillStyle = kid.bg; ctx.beginPath(); ctx.roundRect(X, Y, w, h, 22 * k); ctx.fill(); ctx.strokeStyle = 'rgba(19,41,75,.12)'; ctx.lineWidth = 3 * k; ctx.stroke();
   const T = document.createElement('canvas'); T.width = w; T.height = h; const t = T.getContext('2d'); t.textAlign = 'left'; t.textBaseline = 'middle'; t.fillStyle = '#000';
   for (let c = 0; c < CKC.length; c++) {
     const q = CKC[c]; if (q[0] !== side) continue;
-    const i = ckOwner[c], nm = i >= 0 ? D[i].p + ' ' + D[i].n : 'Ton nom ici', bx = q[1] * k - X, by = q[2] * k - Y, bw = (q[3] - q[1]) * k, bh = (q[4] - q[2]) * k, fz = q[5] * k * 1.06;
+    const i = ckOwner[c], nm = i >= 0 ? D[i].p + ' ' + D[i].n : 'Ton nom ici', bx = q[1] * k - X, by = q[2] * k - Y, bw = (q[3] - q[1]) * k, bh = (q[4] - q[2]) * k, fz = q[5] * k * 1.12;
     t.font = `800 ${fz}px ${STICK_FONT}`; const tw = t.measureText(nm).width || 1; let sx = bw / tw, sy = 1; if (sx < 0.62) { sy = sx / 0.62; }
     t.save(); t.translate(bx, by + bh * 0.53); t.scale(sx, sy); t.globalAlpha = i >= 0 ? 1 : 0.5; t.fillText(nm, 0, 0); t.restore();
   }
-  t.globalCompositeOperation = 'source-in'; t.drawImage(kidDuo(kid, k), 0, 0); t.globalCompositeOperation = 'source-over';
-  ctx.save(); ctx.beginPath(); ctx.roundRect(X, Y, w, h, 22 * k); ctx.clip(); ctx.drawImage(T, X, Y); ctx.restore();
+  const duo = kidDuo(kid, k); t.globalCompositeOperation = 'source-in'; t.drawImage(duo, 0, 0); t.globalCompositeOperation = 'source-over';
+  ctx.save(); ctx.beginPath(); ctx.roundRect(X, Y, w, h, 22 * k); ctx.clip(); ctx.globalAlpha = 0.3; ctx.drawImage(duo, X, Y); ctx.globalAlpha = 1; ctx.drawImage(T, X, Y); ctx.restore();   // lavis léger de la photo sous les noms : sur fond blanc, le visage reste lisible
   const e = ENF.enfants.find(x => x.num === kid.num); if (!e) return;
   const cs = 30 * k, label = `${e.prenom} · ${e.pays}`, sub = 'portrait dessiné par les noms des donateurs du cockpit';
   ctx.font = `800 ${cs}px ${STICK_FONT}`; const lw = ctx.measureText(label).width; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; const sw = ctx.measureText(sub).width, bw = Math.max(lw, sw) + cs * 1.2, bh = cs * 2.2;
-  ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.beginPath(); ctx.roundRect(X + cs * 0.5, Y + cs * 0.5, bw, bh, cs * 0.4); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.beginPath(); ctx.roundRect(X + cs * 0.5, Y + cs * 0.5, bw, bh, cs * 0.4); ctx.fill(); ctx.strokeStyle = 'rgba(19,41,75,.15)'; ctx.lineWidth = 2 * k; ctx.stroke();
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = kid.acc; ctx.font = `800 ${cs}px ${STICK_FONT}`; ctx.fillText(label, X + cs * 1.1, Y + cs * 1.55);
   ctx.fillStyle = '#5b6573'; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; ctx.fillText(sub, X + cs * 1.1, Y + cs * 2.25);
 }
@@ -620,7 +620,7 @@ function drawCk() {
       const q = CKC[c], x0 = q[1] * k, y0 = q[2] * k, x1 = q[3] * k, y1 = q[4] * k, hh = y1 - y0;
       ctx.beginPath(); ctx.roundRect(x0, y0 + hh * 0.04, x1 - x0, hh * 0.92, hh * 0.3);
       if (c === ckSel) { ctx.fillStyle = '#ce111e'; ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = `800 ${hh * 0.7}px ${STICK_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TON NOM ICI', (x0 + x1) / 2, y0 + hh * 0.54); }
-      else { ctx.fillStyle = 'rgba(43,200,120,.28)'; ctx.fill(); ctx.strokeStyle = 'rgba(70,220,140,.95)'; ctx.lineWidth = Math.max(1, 1.3 * k); ctx.stroke(); }
+      else { ctx.fillStyle = 'rgba(43,182,115,.22)'; ctx.fill(); ctx.strokeStyle = 'rgba(22,140,82,.95)'; ctx.lineWidth = Math.max(1, 1.3 * k); ctx.stroke(); }
     }
   }
   ckTex.needsUpdate = true; dirty = true;

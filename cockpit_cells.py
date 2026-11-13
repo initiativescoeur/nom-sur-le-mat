@@ -10,7 +10,7 @@ W, H = 4096, round(4096 * 0.84 / 1.9)
 head, pad, midW = H * 0.085 / 0.84, 40, 900
 top = head + pad; ah = int(H - top - pad); aw = int((W - midW - pad * 4) / 2)
 AREAS = [(pad, top), (W - pad - aw, top)]
-KIDS = [(556, 'khadidja.png', (140, 30, 380, 330), 1.0), (557, 'nafissatou.png', (175, 100, 495, 510), 1.45)]
+KIDS = [(551, 'mamayari.png', (20, 20, 390, 470), 1.8), (558, 'shalom.png', (205, 255, 545, 735), 1.6)]   # fond blanc : l'encre suit les zones sombres
 S0, EM, GAP = 13, 5.6, 0.2
 BIG = [(32, 0.05, 3), (22, 0.06, 5)]
 
@@ -46,7 +46,7 @@ def pack(G, A, seed):
         for y in range(0, ah - bh, max(2, bh // 4)):
             for x in range(0, aw - bw, max(2, bw // 12)):
                 c, sd, m = stats(x, y, bw, bh)
-                if c >= 0.98 and sd <= smax and m >= 0.45: cands.append((sd - 0.3 * m + rnd.random() * 0.03, x, y))
+                if c >= 0.98 and sd <= smax and m <= 0.5: cands.append((sd + 0.3 * m + rnd.random() * 0.03, x, y))   # grands mots : zones unies et sombres
         cands.sort(); k = 0
         for _, x, y in cands:
             if k >= cnt: break
