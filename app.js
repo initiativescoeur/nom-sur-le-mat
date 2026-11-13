@@ -42,7 +42,7 @@ const owner = new Int32Array(NS).fill(-1);
 const CK = Object.assign({ w: 1.9, h: 0.84, cx: 0, cy: 1.36, z: -4.37, head: 0.085, lh: 19, cw: 122, cells: [], portraits: [] }, MAT.cockpit || {}); CK.n = CK.cells.length;
 const ckOwner = new Int32Array(CK.n).fill(-1);
 const isCk = o => !!o && o.ck >= 0;
-const ckLabel = c => `Cockpit · portrait de ${ckKid(c)} · ligne ${CK.cells[c][1] + 1}`;
+const ckLabel = c => `Cockpit · portrait de ${ckKid(c)} · place ${ckNum(c)}`;
 const D = DON.rows.map((r, i) => { const o = { i }; DON.cols.forEach((c, k) => o[c] = r[k]); return o; });
 function occupy(o) {
   if (o.ck >= 0) { ckOwner[o.ck] = o.i; return; }
@@ -532,19 +532,25 @@ const ckHeadPx = () => ckCanvas.height * CK.head / CK.h;
 /* --- les places du cockpit sont des cases sur deux portraits d'enfants (data/mat.json « cockpit », calculé par cockpit_cells.py) :
    chaque nom dessine un morceau du visage (graisse et couleur suivent l'image) ; une place libre reste un trait pâle, le portrait
    devient plus net à chaque nom. Au centre, les emplacements réservés aux logos (Mécénat Chirurgie Cardiaque, partenaires). */
-const TYPO_KIDS = CK.portraits.map((p, i) => Object.assign({ num: p.num, area: p.area, fit: p.fit },
-  [{ pal: ['#1c0003', '#c10f1c', '#fbe3e4'], bg: '#f1ece9', acc: '#c10f1c' }, { pal: ['#03091a', '#1b4aa0', '#e2eaf8'], bg: '#ebeef3', acc: '#1b4aa0' }][i % 2]));
+const TYPO_KIDS = CK.portraits.map((p, i) => Object.assign({ num: p.num, area: p.area },
+  [{ pal: ['#2a2434', '#c6222e', '#fff4ec'], acc: '#c10f1c' }, { pal: ['#222c42', '#3c76d2', '#f4f8ff'], acc: '#1b4aa0' }][i % 2], { bg: '#0b1422' }));
 TYPO_KIDS.forEach(k => { k.img = new Image(); k.img.onload = () => { k.duo = null; try { drawCk(); } catch (e) {} }; k.img.src = `enfants/typo/${k.num}.png`; });
 Promise.all([300, 500, 800].map(w => new FontFace('Barlow Condensed', `url(fonts/barlow-condensed-latin-${w}-normal.woff2)`, { weight: String(w) }).load().then(f => document.fonts.add(f)).catch(() => {})))
   .then(() => { try { drawCk(); } catch (e) {} });
 const hex3 = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const CKSTART = [0, 0]; CKC.forEach((q, i) => { if (q[0] === 1 && !CKSTART[1]) CKSTART[1] = i; });
+const ckNum = c => c - CKSTART[CKC[c][0]] + 1;
+const ckCellH = c => (CKC[c][4] - CKC[c][2]) / CKR[1] * CK.h;
 function ckKid(c) { const k = TYPO_KIDS[CKC[c] ? CKC[c][0] : 0], e = k && ENF.enfants.find(x => x.num === k.num); return e ? e.prenom : ''; }
-function ckFace(side) { const k = TYPO_KIDS[side]; return [k.area[0] + k.fit[0] + k.fit[2] / 2, k.area[1] + k.fit[1] + k.fit[3] * 0.4]; }
-function ckNeighbors(c) {
-  const q = CKC[c], xm = (q[2] + q[4]) / 2, out = [];
-  const same = (j, w) => { const r = CKC[j]; if (r && r[0] === q[0] && r[1] === q[1] && ckOwner[j] >= 0) out.push([ckOwner[j], w]); };
-  same(c - 1, 'à gauche'); same(c + 1, 'à droite');
-  for (const [dl, w] of [[-1, 'au-dessus'], [1, 'en dessous']]) { const j = CKC.findIndex(r => r[0] === q[0] && r[1] === q[1] + dl && r[2] <= xm && xm < r[4]); if (j >= 0 && ckOwner[j] >= 0) out.push([ckOwner[j], w]); }
+function ckFace(side) { const a = TYPO_KIDS[side].area; return [a[0] + a[2] / 2, a[1] + a[3] * 0.42]; }
+function ckNeighbors(c) {                       // voisins dans le portrait : même rangée à gauche et à droite, rangées du dessus et du dessous
+  const q = CKC[c], xm = (q[1] + q[3]) / 2, out = []; let L = -1, R = -1, U = -1, Dn = -1, dl = 1e9, dr = 1e9, du = 1e9, dd = 1e9;
+  for (let j = 0; j < CKC.length; j++) {
+    const r = CKC[j]; if (j === c || r[0] !== q[0]) continue;
+    if (Math.abs(r[2] - q[2]) < 3) { if (r[3] <= q[1] && q[1] - r[3] < dl) { dl = q[1] - r[3]; L = j; } if (r[1] >= q[3] && r[1] - q[3] < dr) { dr = r[1] - q[3]; R = j; } }
+    else if (r[1] <= xm && xm < r[3]) { if (r[4] <= q[2] && q[2] - r[4] < du) { du = q[2] - r[4]; U = j; } if (r[2] >= q[4] && r[2] - q[4] < dd) { dd = r[2] - q[4]; Dn = j; } }
+  }
+  for (const [j, w, dist] of [[L, 'à gauche', dl], [R, 'à droite', dr], [U, 'au-dessus', du], [Dn, 'en dessous', dd]]) if (j >= 0 && dist < 40 && ckOwner[j] >= 0) out.push([ckOwner[j], w]);
   return out;
 }
 function drawCkHead(ctx, W, hp) {
@@ -553,45 +559,39 @@ function drawCkHead(ctx, W, hp) {
   ctx.fillText("ILS NAVIGUENT AVEC VIOLETTE  ·  COCKPIT D'INITIATIVES-CŒUR", W / 2, hp * 0.54);
   heartPath(ctx, hp * 0.62, hp * 0.52, hp * 0.62); ctx.fill(); heartPath(ctx, W - hp * 0.62, hp * 0.52, hp * 0.62); ctx.fill();
 }
-function kidDuo(kid, k) {                       // le portrait en bichromie, à la taille de la zone (mis en cache)
+function kidDuo(kid, k) {                       // les tons du portrait (calculés hors ligne, cockpit_cells.py) → couleurs, à la taille de la zone
   if (kid.duo && kid.duo.k === k) return kid.duo.cv;
-  const [fx, fy, fw, fh] = kid.fit.map(v => v * k), w = Math.ceil(kid.area[2] * k), h = Math.ceil(kid.area[3] * k);
-  const C = document.createElement('canvas'); C.width = w; C.height = h; const c = C.getContext('2d'); c.fillStyle = kid.bg; c.fillRect(0, 0, w, h);
+  const w = Math.ceil(kid.area[2] * k), h = Math.ceil(kid.area[3] * k), C = document.createElement('canvas'); C.width = w; C.height = h;
+  const c = C.getContext('2d'), [c0, c1, c2] = kid.pal.map(hex3); c.fillStyle = kid.pal[0]; c.fillRect(0, 0, w, h);
   const img = kid.img; if (!(img && img.complete && img.naturalWidth)) return C;
-  const P = document.createElement('canvas'); P.width = Math.ceil(fw / 2); P.height = Math.ceil(fh / 2); const pc = P.getContext('2d', { willReadFrequently: true });
-  pc.drawImage(img, 0, 0, P.width, P.height); const im = pc.getImageData(0, 0, P.width, P.height), a = im.data, [c0, c1, c2] = kid.pal.map(hex3), bg = hex3(kid.bg);
+  const P = document.createElement('canvas'); P.width = img.naturalWidth; P.height = img.naturalHeight; const pc = P.getContext('2d', { willReadFrequently: true });
+  pc.drawImage(img, 0, 0); const im = pc.getImageData(0, 0, P.width, P.height), a = im.data;
   for (let i = 0; i < a.length; i += 4) {
-    const L0 = clamp((0.2126 * a[i] + 0.7152 * a[i + 1] + 0.0722 * a[i + 2]) / 255, 0, 1), L = L0 * L0 * (3 - 2 * L0), A = a[i + 3] / 255, lo = L < 0.5, f = lo ? L / 0.5 : (L - 0.5) / 0.5, u = lo ? c0 : c1, v = lo ? c1 : c2;
-    for (let j = 0; j < 3; j++) a[i + j] = (u[j] + (v[j] - u[j]) * f) * A + bg[j] * (1 - A);
+    const g0 = clamp((a[i] / 255 - 0.1) / 0.8, 0, 1), g = g0 * g0 * (3 - 2 * g0), A = a[i + 3] / 255, lo = g < 0.5, f = lo ? g / 0.5 : (g - 0.5) / 0.5, u = lo ? c0 : c1, v = lo ? c1 : c2;
+    for (let j = 0; j < 3; j++) a[i + j] = (u[j] + (v[j] - u[j]) * f) * A + c0[j] * (1 - A);
     a[i + 3] = 255;
   }
-  pc.putImageData(im, 0, 0); c.imageSmoothingQuality = 'high'; c.drawImage(P, fx, fy, fw, fh);
+  pc.putImageData(im, 0, 0); c.imageSmoothingQuality = 'high'; c.drawImage(P, 0, 0, w, h);
   kid.duo = { k, cv: C }; return C;
 }
-function drawPortrait(ctx, kid, side, k) {
-  const X = kid.area[0] * k, Y = kid.area[1] * k, w = Math.ceil(kid.area[2] * k), h = Math.ceil(kid.area[3] * k), lh = CK.lh * k, fs = lh * 0.84;
-  const T = document.createElement('canvas'); T.width = w; T.height = h; const t = T.getContext('2d'); t.textAlign = 'center'; t.textBaseline = 'alphabetic'; t.fillStyle = t.strokeStyle = '#000';
+function drawPortrait(ctx, kid, side, k) {      // chaque place est une case : le nom la remplit exactement (justifié), aucun mot n'en recouvre un autre
+  const X = kid.area[0] * k, Y = kid.area[1] * k, w = Math.ceil(kid.area[2] * k), h = Math.ceil(kid.area[3] * k);
+  ctx.fillStyle = kid.bg; ctx.beginPath(); ctx.roundRect(X, Y, w, h, 22 * k); ctx.fill();
+  const T = document.createElement('canvas'); T.width = w; T.height = h; const t = T.getContext('2d'); t.textAlign = 'left'; t.textBaseline = 'middle'; t.fillStyle = '#000';
   for (let c = 0; c < CKC.length; c++) {
     const q = CKC[c]; if (q[0] !== side) continue;
-    const x0 = q[2] * k - X, y0 = q[3] * k - Y, x1 = q[4] * k - X, cw = x1 - x0, yc = y0 + lh / 2, d = q[6], i = ckOwner[c];
-    if (i >= 0) {
-      const o = D[i], txt = o.p + ' ' + o.n, wt = d < 0.3 ? 600 : 800; let size = fs;
-      t.font = `${wt} ${size}px ${STICK_FONT}`; const tw = t.measureText(txt).width; if (tw > cw * 0.94) { size *= cw * 0.94 / tw; t.font = `${wt} ${size}px ${STICK_FONT}`; }
-      t.globalAlpha = 1; t.fillText(txt, (x0 + x1) / 2, yc + size * 0.35);
-      if (d >= 0.45) { t.lineWidth = size * (0.02 + 0.05 * d); t.strokeText(txt, (x0 + x1) / 2, yc + size * 0.35); }
-    } else { t.globalAlpha = 0.3; t.beginPath(); t.roundRect(x0 + cw * 0.1, yc - lh * 0.16, cw * 0.8, lh * 0.32, lh * 0.16); t.fill(); }
+    const i = ckOwner[c], nm = i >= 0 ? D[i].p + ' ' + D[i].n : 'Ton nom ici', bx = q[1] * k - X, by = q[2] * k - Y, bw = (q[3] - q[1]) * k, bh = (q[4] - q[2]) * k, fz = q[5] * k * 1.06;
+    t.font = `800 ${fz}px ${STICK_FONT}`; const tw = t.measureText(nm).width || 1; let sx = bw / tw, sy = 1; if (sx < 0.62) { sy = sx / 0.62; }
+    t.save(); t.translate(bx, by + bh * 0.53); t.scale(sx, sy); t.globalAlpha = i >= 0 ? 1 : 0.5; t.fillText(nm, 0, 0); t.restore();
   }
-  t.globalAlpha = 1; const C = kidDuo(kid, k);
-  t.globalCompositeOperation = 'source-in'; t.drawImage(C, 0, 0); t.globalCompositeOperation = 'source-over';
-  const [fx, fy, fw, fh] = kid.fit.map(v => v * k);
-  ctx.save(); ctx.globalAlpha = 0.3; ctx.drawImage(C, fx, fy, fw, fh, X + fx, Y + fy, fw, fh); ctx.restore();
-  ctx.drawImage(T, X, Y);
+  t.globalCompositeOperation = 'source-in'; t.drawImage(kidDuo(kid, k), 0, 0); t.globalCompositeOperation = 'source-over';
+  ctx.save(); ctx.beginPath(); ctx.roundRect(X, Y, w, h, 22 * k); ctx.clip(); ctx.drawImage(T, X, Y); ctx.restore();
   const e = ENF.enfants.find(x => x.num === kid.num); if (!e) return;
   const cs = 30 * k, label = `${e.prenom} · ${e.pays}`, sub = 'portrait dessiné par les noms des donateurs du cockpit';
   ctx.font = `800 ${cs}px ${STICK_FONT}`; const lw = ctx.measureText(label).width; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; const sw = ctx.measureText(sub).width, bw = Math.max(lw, sw) + cs * 1.2, bh = cs * 2.2;
-  ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.beginPath(); ctx.roundRect(X + cs * 0.4, Y + cs * 0.4, bw, bh, cs * 0.4); ctx.fill();
-  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = kid.acc; ctx.font = `800 ${cs}px ${STICK_FONT}`; ctx.fillText(label, X + cs, Y + cs * 1.45);
-  ctx.fillStyle = '#5b6573'; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; ctx.fillText(sub, X + cs, Y + cs * 2.15);
+  ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.beginPath(); ctx.roundRect(X + cs * 0.5, Y + cs * 0.5, bw, bh, cs * 0.4); ctx.fill();
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = kid.acc; ctx.font = `800 ${cs}px ${STICK_FONT}`; ctx.fillText(label, X + cs * 1.1, Y + cs * 1.55);
+  ctx.fillStyle = '#5b6573'; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; ctx.fillText(sub, X + cs * 1.1, Y + cs * 2.25);
 }
 function typoLogos(ctx, X, Y, w, h, k) {
   const card = (x, y, cw, ch, title, sub, main) => {
@@ -599,7 +599,7 @@ function typoLogos(ctx, X, Y, w, h, k) {
     ctx.setLineDash([16 * k, 10 * k]); ctx.lineWidth = 4 * k; ctx.strokeStyle = main ? 'rgba(206,17,30,.75)' : 'rgba(19,41,75,.32)'; ctx.stroke(); ctx.setLineDash([]);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const ts = Math.min(ch * 0.2, cw * 0.11) * (main ? 1 : 0.9);
     if (main) { ctx.fillStyle = '#ce111e'; heartPath(ctx, x + cw / 2, y + ch * 0.3, ch * 0.22); ctx.fill(); }
-    ctx.fillStyle = main ? '#13294b' : '#3c4a5e'; ctx.font = `800 ${ts}px ${STICK_FONT}`; ctx.fillText(title, x + cw / 2, y + ch * (main ? 0.62 : 0.44));
+    ctx.fillStyle = main ? '#13294b' : '#3c4a5e'; ctx.font = `800 ${ts}px ${STICK_FONT}`; const tw0 = ctx.measureText(title).width, ts2 = tw0 > cw * 0.88 ? ts * cw * 0.88 / tw0 : ts; ctx.font = `800 ${ts2}px ${STICK_FONT}`; ctx.fillText(title, x + cw / 2, y + ch * (main ? 0.62 : 0.44));
     ctx.fillStyle = '#8a93a0'; ctx.font = `500 ${ts * 0.58}px ${STICK_FONT}`; ctx.fillText(sub, x + cw / 2, y + ch * (main ? 0.8 : 0.7));
   };
   const g = 22 * k; let y = Y;
@@ -615,20 +615,19 @@ function drawCk() {
   TYPO_KIDS.forEach((kid, s) => drawPortrait(ctx, kid, s, k));
   const pad = 40 * k, midW = 900 * k, pw = (W - midW - pad * 4) / 2; typoLogos(ctx, pad * 2 + pw, hp + pad, midW, H - hp - pad * 2, k);
   if (pickMode && DS.zone === 'ck') {                      // choix d'une place : les cases libres en vert, la place choisie en rouge
-    const lh = CK.lh * k;
     for (let c = 0; c < CKC.length; c++) {
       if (ckOwner[c] >= 0 && c !== ckSel) continue;
-      const q = CKC[c], x0 = q[2] * k, y0 = q[3] * k, x1 = q[4] * k;
-      ctx.beginPath(); ctx.roundRect(x0 + 2 * k, y0 + lh * 0.1, x1 - x0 - 4 * k, lh * 0.8, lh * 0.3);
-      if (c === ckSel) { ctx.fillStyle = '#ce111e'; ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = `800 ${lh * 0.62}px ${STICK_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TON NOM ICI', (x0 + x1) / 2, y0 + lh * 0.53); }
-      else { ctx.fillStyle = 'rgba(43,182,115,.2)'; ctx.fill(); ctx.strokeStyle = 'rgba(25,150,90,.9)'; ctx.lineWidth = Math.max(1, 1.6 * k); ctx.stroke(); }
+      const q = CKC[c], x0 = q[1] * k, y0 = q[2] * k, x1 = q[3] * k, y1 = q[4] * k, hh = y1 - y0;
+      ctx.beginPath(); ctx.roundRect(x0, y0 + hh * 0.04, x1 - x0, hh * 0.92, hh * 0.3);
+      if (c === ckSel) { ctx.fillStyle = '#ce111e'; ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = `800 ${hh * 0.7}px ${STICK_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TON NOM ICI', (x0 + x1) / 2, y0 + hh * 0.54); }
+      else { ctx.fillStyle = 'rgba(43,200,120,.28)'; ctx.fill(); ctx.strokeStyle = 'rgba(70,220,140,.95)'; ctx.lineWidth = Math.max(1, 1.3 * k); ctx.stroke(); }
     }
   }
   ckTex.needsUpdate = true; dirty = true;
 }
 // position (repère de la plaque, x vers la droite vue depuis l'arrière, y vers le haut) → repère du bateau
 const ckLocal = (u, v) => new THREE.Vector3(CK.cx - (u - 0.5) * CK.w, CK.cy + (0.5 - v) * CK.h, CK.z);   // u, v ∈ [0, 1], v vers le bas
-function ckCellUV(c) { const q = CKC[c]; return { u0: q[2] / CKR[0], u1: q[4] / CKR[0], v0: q[3] / CKR[1], v1: q[5] / CKR[1] }; }
+function ckCellUV(c) { const q = CKC[c]; return { u0: q[1] / CKR[0], u1: q[3] / CKR[0], v0: q[2] / CKR[1], v1: q[4] / CKR[1] }; }
 function ckRect(c) {
   rig.updateMatrixWorld(); camera.updateMatrixWorld(); const q = ckCellUV(c), r = stage.getBoundingClientRect(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   for (const [u, v] of [[q.u0, q.v0], [q.u1, q.v0], [q.u0, q.v1], [q.u1, q.v1]]) { _v.copy(ckLocal(u, v)).applyMatrix4(rig.matrixWorld).project(camera); if (_v.z > 1) return null;
@@ -639,7 +638,7 @@ function ckPick(cx, cy) {
   const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
   rig.updateMatrixWorld(); camera.updateMatrixWorld(); ray.setFromCamera(_ndc, camera);
   const hit = ray.intersectObject(ckMesh, false)[0]; if (!hit || !hit.uv) return null;
-  const px = hit.uv.x * CKR[0], py = (1 - hit.uv.y) * CKR[1], c = CKC.findIndex(q => px >= q[2] && px < q[4] && py >= q[3] && py < q[5]);
+  const px = hit.uv.x * CKR[0], py = (1 - hit.uv.y) * CKR[1], c = CKC.findIndex(q => px >= q[1] && px < q[3] && py >= q[2] && py < q[4]);
   return c >= 0 ? c : null;
 }
 const ckCellCenter = c => { const q = ckCellUV(c); return { x: ((q.u0 + q.u1) / 2 - 0.5) * CK.w, y: (0.5 - (q.v0 + q.v1) / 2) * CK.h }; };
@@ -718,7 +717,7 @@ function selectCk(c) { if (c < 0 || ckOwner[c] >= 0) return; DS.ck = c; ckSel = 
 function ckEntry() {
   const a = stage.clientWidth / Math.max(1, stage.clientHeight), t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   if (a >= 1.1) return { x: 0, d: clamp(CK.w * 0.54 / (t * a), 1.2, 2.6) };
-  const P = TYPO_KIDS[0], u = (P.area[0] + P.fit[0] + P.fit[2] / 2) / CKR[0], wm = P.fit[2] / CKR[0] * CK.w;
+  const P = TYPO_KIDS[0], u = (P.area[0] + P.area[2] / 2) / CKR[0], wm = P.area[2] / CKR[0] * CK.w;
   return { x: (u - 0.5) * CK.w, d: clamp(wm * 0.56 / (t * a), 1.2, 2.6) };
 }
 $('btnCk').onclick = async () => { if (ck.on) { spotCk = -1; await leaveCockpit(); } else { spotSlot = -1; const e = ckEntry(); enterCockpit(e.x, 0, e.d); } };
@@ -1104,16 +1103,16 @@ function renderDone(o) {
   $('tDyk').textContent = DYK[o.i % DYK.length];
 }
 function renderDoneCk(o) {
-  const line = CKC[o.ck][1] + 1, kidN = ckKid(o.ck);
+  const num = ckNum(o.ck), kidN = ckKid(o.ck);
   $('tMerci').textContent = 'Merci '; $('tName').textContent = o.p + ' !'; document.querySelector('.thanks .merci').classList.toggle('long', (o.p.length + 7) > 13);
-  const pills = [['red', 'Cockpit'], ['', `Portrait de ${kidN} · ligne ${line}`]]; if (CFG.afficher_palier && o.pal >= 0) pills.push(['gold', CTP.paliers[o.pal].nom]); if (o.local) pills.push(['red', 'Nouveau à bord']);
+  const pills = [['red', 'Cockpit'], ['', `Portrait de ${kidN} · place ${num}`]]; if (CFG.afficher_palier && o.pal >= 0) pills.push(['gold', CTP.paliers[o.pal].nom]); if (o.local) pills.push(['red', 'Nouveau à bord']);
   $('tWhere').innerHTML = pills.map(([c, t]) => `<span class="pill ${c}">${esc(t)}</span>`).join('');
   const q = $('tQuote'); q.hidden = !o.m; q.innerHTML = o.m ? `« ${esc(o.m)} »<small>${o.local ? 'En attente de validation avant affichage public' : 'Message laissé lors du don'}${o.d ? ' · ' + fdate(o.d) : ''}</small>` : '';
   $('tPerso').hidden = true;
   const kidEl = $('tKid'), k = o.e >= 0 ? ENF.enfants[o.e] : null; kidEl.hidden = !k;
   if (k) { kidEl.innerHTML = `<small>Ton don participe à sauver</small>` + kidCard(k, true) + `<button class="btn small" type="button" id="kidMore">Voir sa fiche et son parcours</button>`; $('kidMore').onclick = () => openKid(k); }
   $('tFacts').innerHTML = [['Sous ses yeux', '≈ 1', 'm', 'de Violette quand elle barre ou règle ses voiles'], ['Autour du monde', '≈ 45 000', 'km', 'au Vendée Globe, dans le cockpit'],
-    ['Ta place', `${line}`, 'ᵉ ligne', `du portrait de ${kidN}, sur ${nf(CK.n)} places`], ['Le cockpit', nf(ckOwner.filter(i => i >= 0).length), 'noms', 'déjà à bord']]
+    ['Ta place', `n° ${num}`, '', `dans le portrait de ${kidN}, sur ${nf(CK.n)} places`], ['Le cockpit', nf(ckOwner.filter(i => i >= 0).length), 'noms', 'déjà à bord']]
     .map(([l, v, u, sub]) => `<div class="fact"><small>${l}</small><b>${v}<u>${u}</u></b><span>${sub}</span></div>`).join('');
   const nb = ckNeighbors(o.ck).map(([i, w]) => `<strong>${donLink(D[i], D[i].p + ' ' + D[i].n)}</strong> ${w}`);
   $('tNeigh').innerHTML = nb.length ? 'Tes voisins dans le cockpit : ' + nb.join(', ') + '.' : '';
@@ -1412,7 +1411,7 @@ function nameRect(o, w, h) {               // rectangle du nom dans une image w 
   return { x0, y0, x1, y1 };
 }
 const tanFov = () => 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-const nameD = (o, rowFrac) => isCk(o) ? clamp(CK.h * CK.lh / CKR[1] / (rowFrac * tanFov()), 0.3, 2.4) : clamp(PITCH / (rowFrac * tanFov()), D_MIN, 3);
+const nameD = (o, rowFrac) => isCk(o) ? clamp(ckCellH(o.ck) / (rowFrac * tanFov()), 0.25, 2.4) : clamp(PITCH / (rowFrac * tanFov()), D_MIN, 3);
 function saveCam() { return { s: nav.s, th: nav.th, d: nav.d, ts: nav.ts, tth: nav.tth, td: nav.td, cy: nav.cy, el: nav.el, ck: ck.on, x: ck.x, y: ck.y, cd: ck.d, tx: ck.tx, ty: ck.ty, ctd: ck.td, ov: camOverride, sp: spotSlot, spw: spotWhole, spc: spotCk }; }
 function loadCam(v) { nav.s = v.s; nav.th = v.th; nav.d = v.d; nav.ts = v.ts; nav.tth = v.tth; nav.td = v.td; nav.cy = v.cy; nav.el = v.el; ck.on = v.ck;
   ck.x = v.x; ck.y = v.y; ck.d = v.cd; ck.tx = v.tx; ck.ty = v.ty; ck.td = v.ctd; camOverride = v.ov; spotSlot = v.sp; spotWhole = v.spw; spotCk = v.spc; dirty = true; }
@@ -2015,7 +2014,7 @@ function renderPlace() {
     box.innerHTML = DS.ck >= 0 ? `<div class="place"><small>Ta place</small><b>${ckLabel(DS.ck)}</b><span>Ton nom dessine un morceau du portrait de ${esc(ckKid(DS.ck))}, sur la cloison du cockpit, sous les yeux de Violette${nbN.length ? ' · à côté de ' + esc(nbN.join(' et ')) : ''}</span></div>`
       : `<div class="place"><small>Comme dans un avion</small><b>Touche une place libre</b><span>Les places du cockpit dessinent deux portraits d'enfants : chaque nom en est un morceau. Les cases vertes sont libres. Fais glisser pour passer d'un portrait à l'autre, zoome pour lire les noms.</span></div>`;
     q.innerHTML = ''; const frees = [...Array(CK.n).keys()].filter(c => ckOwner[c] < 0);
-    const dist = (c, [fx, fy]) => { const q = CKC[c]; return Math.hypot((q[2] + q[4]) / 2 - fx, (q[3] + q[5]) / 2 - fy); };
+    const dist = (c, [fx, fy]) => { const q = CKC[c]; return Math.hypot((q[1] + q[3]) / 2 - fx, (q[2] + q[4]) / 2 - fy); };
     TYPO_KIDS.forEach((K, s) => { const e = ENF.enfants.find(x => x.num === K.num), f = ckFace(s), fr = frees.filter(c => CKC[c][0] === s);
       if (fr.length) q.append(chip(`Sur le visage de ${e ? e.prenom : 'l\'enfant'}`, 'blue', () => selectCk(fr.sort((a, b) => dist(a, f) - dist(b, f))[0]))); });
     q.append( chip('Au hasard', 'blue', () => selectCk(frees[Math.floor(Math.random() * frees.length)])), chip('Plutôt le mât', 'perso', () => { DS.zone = 'mat'; DS.ck = -1; ckSel = -1; drawCk(); gotoStep(1); }));
@@ -2046,7 +2045,7 @@ function drawSticker() {
   const cv = $('sticker'), ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
   ctx.fillStyle = '#fafaf7'; ctx.fillRect(0, 0, W, H);
   const p = $('dPrenom').value.trim() || 'Prénom', n = $('dNom').value.trim() || 'Nom';
-  const sl = DS.slot >= 0 ? DS.slot : nextAuto(), s = rowS(dec(sl).row), inCk = DS.zone === 'ck', cellW = inCk ? CK.cw / CKR[0] * CK.w : zoneW(s) / 3, rowH = inCk ? CK.lh / CKR[1] * CK.h : PITCH;
+  const sl = DS.slot >= 0 ? DS.slot : nextAuto(), s = rowS(dec(sl).row), inCk = DS.zone === 'ck', cellW = inCk ? (DS.ck >= 0 ? CKC[DS.ck][3] - CKC[DS.ck][1] : CK.cw) / CKR[0] * CK.w : zoneW(s) / 3, rowH = inCk ? (DS.ck >= 0 ? ckCellH(DS.ck) : CK.lh / CKR[1] * CK.h) : PITCH;
   const scale = W * 0.8 / cellW, rowPx = Math.min(rowH * scale, H * 0.72);              // échelle : la case occupe 80 % de l'aperçu
   ctx.strokeStyle = '#c9ccd1'; ctx.setLineDash([8, 6]); ctx.lineWidth = 2; ctx.strokeRect(W * .1, H / 2 - rowPx / 2, W * .8, rowPx); ctx.setLineDash([]);
   const fit = fitName(ctx, { p, n }, W * .8 - rowPx * .35, rowPx, false);
