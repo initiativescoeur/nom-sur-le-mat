@@ -532,7 +532,7 @@ const ckHeadPx = () => ckCanvas.height * CK.head / CK.h, ckRowPx = () => (ckCanv
    corps, graisse et couleur variant avec l'image ; au centre, les emplacements réservés aux logos (Mécénat Chirurgie Cardiaque, partenaires) */
 let ckDeco = 'portraits', typoHits = [], typoHome = new Map();
 const ckTypoOn = () => ckDeco === 'portraits' && !(pickMode && DS.zone === 'ck');
-const TYPO_KIDS = [{ num: 553, pal: ['#2e0207', '#c20f1b', '#f7c9cc'], bg: '#e9e1de' }, { num: 556, pal: ['#060f24', '#1d4b9e', '#bcd0f2'], bg: '#e1e5ec' }];
+const TYPO_KIDS = [{ num: 556, pal: ['#1c0003', '#c10f1c', '#fbe3e4'], bg: '#f1ece9' }, { num: 557, pal: ['#03091a', '#1b4aa0', '#e2eaf8'], bg: '#ebeef3' }];
 TYPO_KIDS.forEach(k => { k.img = new Image(); k.img.onload = () => { try { drawCk(); } catch (e) {} }; k.img.src = `enfants/typo/${k.num}.png`; });
 Promise.all([300, 500, 800].map(w => new FontFace('Barlow Condensed', `url(fonts/barlow-condensed-latin-${w}-normal.woff2)`, { weight: String(w) }).load().then(f => document.fonts.add(f)).catch(() => {})))
   .then(() => { try { drawCk(); } catch (e) {} });
@@ -545,8 +545,8 @@ function drawCkHead(ctx, W, hp) {
 }
 function typoPortrait(ctx, kid, X, Y, w, h, names, start, k) {
   w = Math.floor(w); h = Math.floor(h);
-  const img = kid.img, ok = img && img.complete && img.naturalWidth, fs = Math.max(13.5 * k, 10), lh = fs * 1.02, q = 4;
-  let fit = null; if (ok) { const sc = Math.min(w * 1.08 / img.naturalWidth, h * 0.97 / img.naturalHeight); fit = { w: img.naturalWidth * sc, h: img.naturalHeight * sc }; fit.x = (w - fit.w) / 2; fit.y = h - fit.h; }
+  const img = kid.img, ok = img && img.complete && img.naturalWidth, fs = Math.max(11 * k, 9), lh = fs * 0.96, q = 3;
+  let fit = null; if (ok) { const sc = Math.min(w * 1.0 / img.naturalWidth, h * 0.99 / img.naturalHeight); fit = { w: img.naturalWidth * sc, h: img.naturalHeight * sc }; fit.x = (w - fit.w) / 2; fit.y = h - fit.h; }
   // l'image, réduite, sert à lire la densité sous chaque nom
   const S = document.createElement('canvas'); S.width = Math.ceil(w / q); S.height = Math.ceil(h / q); const sx = S.getContext('2d', { willReadFrequently: true });
   if (fit) sx.drawImage(img, fit.x / q, fit.y / q, fit.w / q, fit.h / q);
@@ -561,9 +561,9 @@ function typoPortrait(ctx, kid, X, Y, w, h, names, start, k) {
       const i = names[n % names.length]; n++; const o = D[i], txt = o.p + ' ' + o.n;
       t.font = `500 ${fs}px ${STICK_FONT}`; const w0 = t.measureText(txt).width; let sum = 0, cnt = 0;
       for (let j = 0; j <= 4; j++) { const d = dark(x + w0 * j / 4, y - fs * 0.35); if (d >= 0) { sum += d; cnt++; } }
-      const d = cnt >= 3 ? sum / cnt : -1, wt = d < 0.25 ? 300 : d < 0.45 ? 500 : d < 0.62 ? 700 : 800, size = fs * (d < 0 ? 0.9 : 0.94 + 0.16 * d);
+      const d = cnt >= 3 ? sum / cnt : -1, wt = d < 0 ? 300 : d < 0.3 ? 600 : 800, size = fs * (d < 0 ? 0.9 : 1);
       t.font = `${wt} ${size}px ${STICK_FONT}`; const ww = t.measureText(txt).width; t.fillText(txt, x, y);
-      if (d >= 0.62) { t.lineWidth = size * 0.07; t.strokeStyle = '#000'; t.strokeText(txt, x, y); }
+      if (d >= 0) { t.lineWidth = size * (0.03 + 0.05 * d); t.strokeStyle = '#000'; t.strokeText(txt, x, y); }
       const x0 = Math.max(0, x), x1 = Math.min(w, x + ww);
       if (x1 - x0 > ww * 0.6 && y < h) typoHits.push({ x0: X + x0, y0: Y + y - size * 0.82, x1: X + x1, y1: Y + y + size * 0.22, i, d, full: x0 === x && x1 === x + ww });
       x += ww; t.font = `300 ${fs}px ${STICK_FONT}`; t.fillText('  ·  ', x, y); x += t.measureText('  ·  ').width;
@@ -576,13 +576,14 @@ function typoPortrait(ctx, kid, X, Y, w, h, names, start, k) {
     const P = document.createElement('canvas'); P.width = Math.ceil(fit.w / 2); P.height = Math.ceil(fit.h / 2); const pc = P.getContext('2d', { willReadFrequently: true });
     pc.drawImage(img, 0, 0, P.width, P.height); const im = pc.getImageData(0, 0, P.width, P.height), a = im.data, [c0, c1, c2] = kid.pal.map(hex3), bg = hex3(kid.bg);
     for (let i = 0; i < a.length; i += 4) {
-      const L0 = clamp(((0.2126 * a[i] + 0.7152 * a[i + 1] + 0.0722 * a[i + 2]) / 255 - 0.1) / 0.72, 0, 1), L = L0 * L0 * (3 - 2 * L0), A = a[i + 3] / 255, lo = L < 0.5, f = lo ? L / 0.5 : (L - 0.5) / 0.5, u = lo ? c0 : c1, v = lo ? c1 : c2;
+      const L0 = clamp((0.2126 * a[i] + 0.7152 * a[i + 1] + 0.0722 * a[i + 2]) / 255, 0, 1), L = L0 * L0 * (3 - 2 * L0), A = a[i + 3] / 255, lo = L < 0.5, f = lo ? L / 0.5 : (L - 0.5) / 0.5, u = lo ? c0 : c1, v = lo ? c1 : c2;
       for (let j = 0; j < 3; j++) a[i + j] = (u[j] + (v[j] - u[j]) * f) * A + bg[j] * (1 - A);
       a[i + 3] = 255;
     }
     pc.putImageData(im, 0, 0); c.imageSmoothingQuality = 'high'; c.drawImage(P, fit.x, fit.y, fit.w, fit.h);
   }
   t.globalCompositeOperation = 'source-in'; t.drawImage(C, 0, 0); t.globalCompositeOperation = 'source-over';
+  if (fit) { ctx.save(); ctx.globalAlpha = 0.38; ctx.drawImage(C, fit.x, fit.y, fit.w, fit.h, X + fit.x, Y + fit.y, fit.w, fit.h); ctx.restore(); }
   ctx.drawImage(T, X, Y);
   // légende
   const e = ENF.enfants.find(x => x.num === kid.num); if (!e) return;
@@ -1728,9 +1729,9 @@ function bindRef(box, o) { const b = box.querySelector('[data-a=refcopy]'); if (
 function chainText(o) {
   if (o.perso >= 0) return '';
   const k = o.e >= 0 ? ENF.enfants[o.e] : null; let a;
-  if (isCk(o)) { const n = ckOwner.filter(i => i >= 0 && i !== o.i).length; a = `Ton nom est dans le cockpit, avec ${plural(n, 'autre nom', 'autres noms')} sous les yeux de Violette.`; }
+  if (isCk(o)) { const n = ckOwner.filter(i => i >= 0 && i !== o.i).length; a = `Ton nom est dans le cockpit, avec ${plural(n, 'autre nom', 'autres noms')} sous les yeux de Violette. Pendant les courses, il pourra apparaître dans ses vidéos tournées à bord.`; }
   else { const { row } = dec(o.slot); let n = 0; for (const ff of [0, 1]) for (let c = 0; c < NC; c++) { const w = owner[enc(ff, row, c)]; if (w >= 0 && w !== o.i) n++; }
-    a = `Ton nom est au rang ${row} du mât, ${n ? `avec ${plural(n, 'autre nom', 'autres noms')} à la même hauteur` : 'seul à cette hauteur pour l\'instant'}.`; }
+    a = `Ton nom est au rang ${row} du mât, ${n ? `avec ${plural(n, 'autre nom', 'autres noms')} à la même hauteur` : 'seul à cette hauteur pour l\'instant'}. Pendant les courses, il pourra apparaître dans les vidéos de Violette.`; }
   const de = k ? (VOY.test(k.prenom) ? "d'" : 'de ') : '';
   const b = k ? ` Ton don rejoint ${k.donateurs > 1 ? `ceux de ${plural(k.donateurs - 1, 'autre donateur', 'autres donateurs')}` : 'les premiers dons'} pour l'opération ${de}<strong>${esc(k.prenom)}, ${ageTxt(k)}</strong>.` : '';
   const c = NKIDS_DONE ? ` Ensemble, les noms du bateau ont déjà financé <strong>${plural(NKIDS_DONE, 'enfant', 'enfants')}</strong>.` : '';
@@ -2011,8 +2012,8 @@ function gotoStep(n) {
 document.querySelectorAll('[data-next]').forEach(b => b.onclick = () => gotoStep(DS.step + 1));
 const PCK = () => CFG.prix_cockpit || 30;
 function renderZone() {
-  $('zone').innerHTML = `<button type="button" data-z="mat" class="${DS.zone === 'mat' ? 'on' : ''}"><b>Sur le mât</b><span>dès ${CFG.prix_auto} € · ${nf(freeCount())} places</span></button>
-    <button type="button" data-z="ck" class="${DS.zone === 'ck' ? 'on' : ''}"><b>Dans le cockpit</b><span>dès ${PCK()} € · sous les yeux de Violette · ${nf(ckOwner.filter(i => i < 0).length)} places</span></button>`;
+  $('zone').innerHTML = `<button type="button" data-z="mat" class="${DS.zone === 'mat' ? 'on' : ''}"><b>Sur le mât</b><span>dès ${CFG.prix_auto} € · ${nf(freeCount())} places · peut-être dans les vidéos de Violette</span></button>
+    <button type="button" data-z="ck" class="${DS.zone === 'ck' ? 'on' : ''}"><b>Dans le cockpit</b><span>dès ${PCK()} € · sous les yeux de Violette, souvent dans ses vidéos du bord · ${nf(ckOwner.filter(i => i < 0).length)} places</span></button>`;
   $('zone').querySelectorAll('button').forEach(b => b.onclick = () => { DS.zone = b.dataset.z; if (DS.zone === 'ck' && DS.amt < PCK()) DS.amt = PCK(); DS.slot = -1; DS.ck = -1; ckSel = -1; renderAmounts(); });
 }
 function renderAmounts() {

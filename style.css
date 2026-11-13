@@ -368,7 +368,7 @@ input[type=file] { height: auto; padding: 10px; }
 .tirage b { display: block; font: 900 19px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; }
 .tirage span { display: block; font-size: 15px; color: var(--ecume); margin: 2px 0 4px; }
 .lk { background: none; border: 0; padding: 0; color: var(--ciel); text-decoration: underline; cursor: pointer; font-size: 14px; }
-.how { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; counter-reset: how; }
+.how { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; counter-reset: how; }
 .how li { counter-increment: how; display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(159,179,201,.22); }
 .how li::before { content: counter(how); font: 900 26px/1 var(--display); color: var(--coeur); }
 .how b { font: 800 17px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; }
