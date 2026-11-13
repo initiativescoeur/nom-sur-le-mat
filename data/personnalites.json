@@ -4,9 +4,15 @@
   "prenom": "Jamy",
   "nom": "Gourmaud",
   "titre": "Journaliste et vulgarisateur scientifique",
-  "bio": "Figure de la vulgarisation scientifique à la télévision, révélé au grand public par « C'est pas sorcier » sur France 3, il a ensuite lancé « Le Monde de Jamy ».",
-  "lien": "",
-  "photos": [],
+  "bio": "Né en Vendée, journaliste et vulgarisateur scientifique, il a créé et animé « C'est pas sorcier » sur France 3 de 1993 à 2014, puis « Le Monde de Jamy ». Depuis 2020, il partage sa passion du savoir sur sa chaîne YouTube « Épicurieux ».",
+  "lien": "Invité d'Initiatives-Cœur au départ de la Route du Rhum 2026 à Saint-Malo, aux côtés de Violette. Il fait partie des proches sollicités pour lui enregistrer des messages à écouter en mer.",
+  "photos": [
+   {
+    "src": "personnalites/jamy-gourmaud.jpg",
+    "credit": "Visuel générique · photo à venir",
+    "generique": true
+   }
+  ],
   "rang": 394
  },
  {
@@ -14,19 +20,31 @@
   "prenom": "François",
   "nom": "Damiens",
   "titre": "Acteur et humoriste",
-  "bio": "Acteur, humoriste et réalisateur belge, connu pour ses caméras cachées puis pour ses nombreux rôles au cinéma.",
-  "lien": "",
-  "photos": [],
+  "bio": "Acteur, humoriste et réalisateur belge, révélé par ses caméras cachées de « François l'Embrouille », puis devenu une figure du cinéma (La Famille Bélier, Mon Ket…).",
+  "lien": "Il était présent au baptême du nouvel IMOCA Initiatives-Cœur, avant le départ de la Route du Rhum 2022, avec Thomas Pesquet et Nathalie Renoux. Il fait partie des proches sollicités pour enregistrer des messages à Violette.",
+  "photos": [
+   {
+    "src": "personnalites/francois-damiens.jpg",
+    "credit": "Visuel générique · photo à venir",
+    "generique": true
+   }
+  ],
   "rang": 234
  },
  {
   "id": "nathalie-renoux",
   "prenom": "Nathalie",
   "nom": "Renoux",
-  "titre": "Journaliste et présentatrice",
-  "bio": "Journaliste et présentatrice de télévision.",
-  "lien": "",
-  "photos": [],
+  "titre": "Journaliste et présentatrice, marraine du bateau",
+  "bio": "Journaliste et présentatrice de télévision, longtemps visage de l'information sur M6.",
+  "lien": "Marraine d'Initiatives-Cœur : elle a baptisé le bateau de Tanguy de Lamotte au village de la Route du Rhum 2014, puis le nouvel IMOCA de Sam Davies en 2022 avec Thomas Pesquet. Elle était au départ de la Route du Rhum 2026 aux côtés de Violette.",
+  "photos": [
+   {
+    "src": "personnalites/nathalie-renoux.jpg",
+    "credit": "Visuel générique · photo à venir",
+    "generique": true
+   }
+  ],
   "rang": 665
  },
  {
@@ -36,7 +54,13 @@
   "titre": "Astronaute de l'Agence spatiale européenne",
   "bio": "Ingénieure et pilote d'essai d'hélicoptères, elle a rejoint le corps des astronautes de l'ESA en 2022. En 2026, elle a séjourné à bord de la Station spatiale internationale : la deuxième Française à y vivre.",
   "lien": "Avec Violette Dorange, elle forme un duo « Mer & Espace » : la série de lettres « À toi, depuis mon vaisseau » et un programme pédagogique pour les écoles. Violette a assisté à son décollage à Cap Canaveral. Son nom est tout en haut du mât, au plus près des étoiles.",
-  "photos": [],
+  "photos": [
+   {
+    "src": "personnalites/sophie-adenot.jpg",
+    "credit": "Visuel générique · photo à venir",
+    "generique": true
+   }
+  ],
   "rang": 1134
  },
  {
@@ -44,31 +68,49 @@
   "prenom": "Marine",
   "nom": "Lorphelin",
   "titre": "Médecin, Miss France 2013",
-  "bio": "Élue Miss France 2013, elle a poursuivi ses études de médecine et exerce aujourd'hui comme médecin. Elle partage aussi des contenus santé avec une large communauté.",
+  "bio": "Élue Miss France 2013, elle a poursuivi ses études de médecine et exerce aujourd'hui comme médecin. Dès 2013, elle a couru le Marathon de Paris pour Mécénat Chirurgie Cardiaque avec d'autres Miss France. Elle partage des contenus santé avec une large communauté.",
   "lien": "Elle accompagne les contenus d'Initiatives-Cœur sur les réseaux sociaux.",
-  "photos": [],
+  "photos": [
+   {
+    "src": "personnalites/marine-lorphelin.jpg",
+    "credit": "Visuel générique · photo à venir",
+    "generique": true
+   }
+  ],
   "rang": 847,
   "categorie": "Influenceuse"
  },
  {
-  "id": "constance-scharer",
+  "id": "constance-schaerer",
   "prenom": "Constance",
-  "nom": "Scharer",
-  "titre": "Influenceuse, créatrice de contenus",
-  "bio": "Bio à compléter (texte à faire valider par Constance).",
+  "nom": "Schaerer",
+  "titre": "Aventurière, alpiniste et créatrice de contenus",
+  "bio": "Diplômée de KEDGE Business School, elle est devenue en mai 2025 la plus jeune Française à atteindre le sommet de l'Everest, pour réaliser le rêve de son père disparu : gravir les sept plus hauts sommets. Elle a raconté cette aventure dans un premier livre. (Bio à faire valider par Constance.)",
   "lien": "Elle a accompagné Initiatives-Cœur sur la Route du Rhum 2026.",
-  "photos": [],
+  "photos": [
+   {
+    "src": "personnalites/constance-schaerer.jpg",
+    "credit": "Visuel générique · photo à venir",
+    "generique": true
+   }
+  ],
   "categorie": "Influenceuse",
   "rang": 640
  },
  {
-  "id": "nouchka",
+  "id": "nouchka-simic",
   "prenom": "Nouchka",
-  "nom": "",
+  "nom": "Simic",
   "titre": "Nutritionniste, créatrice de contenus",
-  "bio": "Bio à compléter (texte à faire valider par Nouchka).",
+  "bio": "Nutritionniste, elle partage sur les réseaux des conseils simples pour bien manger au quotidien. (Bio à faire valider par Nouchka.)",
   "lien": "Elle partage avec Violette des contenus sur l'alimentation à bord.",
-  "photos": [],
+  "photos": [
+   {
+    "src": "personnalites/nouchka-simic.jpg",
+    "credit": "Visuel générique · photo à venir",
+    "generique": true
+   }
+  ],
   "categorie": "Influenceuse",
   "rang": 410
  }

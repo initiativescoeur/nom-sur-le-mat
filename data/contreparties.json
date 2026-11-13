@@ -4,10 +4,10 @@
    "id": "mousse",
    "min": 10,
    "nom": "Mousse",
-   "accroche": "Votre nom embarque",
+   "accroche": "Ton nom embarque",
    "items": [
-    "Votre prénom et votre nom sur le mât (place attribuée automatiquement)",
-    "Votre fiche à partager et votre message sur le mur des donateurs",
+    "Ton prénom et ton nom sur le mât (place attribuée automatiquement)",
+    "Ta fiche à partager et ton message sur le mur des donateurs",
     "1 participation au tirage au sort"
    ]
   },
@@ -15,10 +15,10 @@
    "id": "matelot",
    "min": 15,
    "nom": "Matelot",
-   "accroche": "Vous choisissez votre place",
+   "accroche": "Tu choisis ta place",
    "items": [
     "Tout le palier Mousse",
-    "Vous choisissez votre place sur le mât, comme un siège d'avion",
+    "Tu choisis ta place sur le mât, comme un siège d'avion",
     "Un fond d'écran « Mon nom est sur le mât »"
    ]
   },
@@ -29,7 +29,7 @@
    "accroche": "Une photo dédicacée",
    "items": [
     "Tout le palier Matelot",
-    "Votre nom peut aller dans le cockpit, sous les yeux de Violette",
+    "Ton nom peut aller dans le cockpit, sous les yeux de Violette",
     "Une photo dédicacée par Violette Dorange",
     "3 participations au tirage au sort"
    ]
@@ -38,7 +38,7 @@
    "id": "barreur",
    "min": 60,
    "nom": "Barreur",
-   "accroche": "Un mot rien que pour vous",
+   "accroche": "Un mot rien que pour toi",
    "items": [
     "Tout le palier Équipier",
     "Un poster dédicacé par Violette Dorange",
@@ -50,7 +50,7 @@
    "id": "skipper",
    "min": 150,
    "nom": "Skipper",
-   "accroche": "Montez à bord",
+   "accroche": "Monte à bord",
    "items": [
     "Tout le palier Barreur",
     "Un livre de Violette Dorange dédicacé",

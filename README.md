@@ -14,9 +14,10 @@ Prototype de la page de levée de fonds d'Initiatives-Cœur : le vrai modèle 3D
 | `data/donateurs.json` | Donateurs publiés (prototype : fictifs) |
 | `data/enfants.json` | Enfants financés, dates (passées ou prévues), ville et coordonnées, hôpital, équipe, photo, répartition par pays (prototype : fictifs) |
 | `data/soignants.json` | Chirurgiens, cardiologues, soignants, familles d'accueil et médecins au pays, publiés seulement avec leur autorisation (`autorise`) (prototype : fictifs) |
-| `enfants/` | Photos des enfants (prototype : illustrations, aucun enfant réel) |
+| `enfants/` | Photos des enfants (démo : vraies photos d'enfants pris en charge par Mécénat Chirurgie Cardiaque, sur des fiches fictives) ; `enfants/typo/` : masques des portraits du cockpit |
 | `data/mat.json` | Géométrie du mât et plan des places (6 804 places), et la plaque du cockpit (`cockpit` : 6 colonnes × 36 rangs = 216 places, position et taille) |
-| `assets/imoca.glb` | Modèle 3D du bateau (visite virtuelle) |
+| `assets/imoca.glb` | Modèle 3D du bateau, déco 2026 (visite 3D d'Ulysse, `imoca-voiles.glb`) : grand-voile haute et J0 affichés, autres voiles masquées, recalé sur le repère du mât |
+| `personnalites/` | Photos des personnalités (démo : visuels génériques par thème, en attendant les vraies photos) |
 
 Le site est statique : il fonctionne tel quel sur GitHub Pages ou sur n'importe quel hébergement.
 
@@ -28,7 +29,7 @@ Le site est statique : il fonctionne tel quel sur GitHub Pages ou sur n'importe 
 - **Réseaux sociaux** : `url_publique` (l'adresse imprimée sur les images et vidéos), `hashtags` (mots-dièse ajoutés à la légende) dans `data/config.json`.
 - **Vidéo de bienvenue de Violette** : déposer le fichier (MP4 vertical, 20 à 30 s, moins de 15 Mo) dans `videos/`, puis renseigner `video_bienvenue`, par exemple `"videos/bienvenue-violette.mp4"`. Tant que le champ est vide, un emplacement réservé s'affiche.
 - **Soignants et familles d'accueil** : `data/soignants.json`, puis l'identifiant de chaque personne dans `equipe` de l'enfant (`data/enfants.json`).
-- **Photos des enfants** : déposer `enfants/<numéro>.jpg` (4/3, environ 800 px) et mettre `"photo_illustration": false`.
+- **Photos des enfants** : déposer `enfants/<numéro>.jpg` (portrait 4/5, environ 640 × 800 px) et retirer `"photo_demo"` quand la fiche est réelle et validée. Démo : les photos sont réelles mais prénoms et histoires sont fictifs ; le site porte `noindex` pour ne pas être référencé.
 
 ## Ce que fait la page
 
@@ -41,7 +42,7 @@ Le site est statique : il fonctionne tel quel sur GitHub Pages ou sur n'importe 
 - **Images pour Instagram et Facebook** : publication 1080 × 1350, story 1080 × 1920, bannière 1200 × 630. Chaque image montre le nom encadré sur le mât (ou dans le cockpit), une vignette du bateau entier avec le point où il se trouve, l'enfant aidé et l'adresse de la campagne. Fabriquées dans le navigateur, sans serveur.
 - **Vidéo de 15 secondes (9:16)** : survol du bateau, montée jusqu'au nom avec le compteur de hauteur et les sons, arrêt sur le nom et l'enfant, carte de fin. Enregistrée en direct dans le navigateur : MP4 sur Safari et Chrome récents, WebM ailleurs.
 - **Partager** : sur téléphone, le menu de partage du téléphone (Instagram, Facebook, WhatsApp…) ; sur ordinateur, téléchargement du fichier. Une légende prête à coller est proposée, avec le lien personnel du donateur.
-- **Parrainage** : chaque donateur a son lien `…/?par=prenom-nom`. Le visiteur qui arrive par ce lien voit « X vous invite à embarquer », et son don est rattaché à X (`r` dans `data/donateurs.json`). La fiche de X affiche « a fait embarquer N noms ».
+- **Parrainage** : chaque donateur a son lien `…/?par=prenom-nom`. Le visiteur qui arrive par ce lien voit « X t'invite à embarquer », et son don est rattaché à X (`r` dans `data/donateurs.json`). La fiche de X affiche « a fait embarquer N noms ».
 - **Phrase-chaîne** : après le don, une phrase relie le donateur à ses voisins de mât, aux autres donateurs de son enfant et au nombre d'enfants financés par tous les noms du bateau.
 
 ## Brancher le système de dons d'Initiatives-Cœur
@@ -78,7 +79,7 @@ Pour le parrainage en production, la réservation envoie aussi `par` (le slug du
 - **Reçu fiscal et contreparties** : préciser qui émet le reçu (Mécénat Chirurgie Cardiaque ou une structure d'Initiatives-Cœur). Les contreparties doivent rester de faible valeur : 25 % du don au plus, dans la limite d'un plafond annuel. À valider avec l'expert-comptable.
 - **Tirage au sort** : un tirage réservé aux donateurs est une loterie. Il faut une autorisation préalable (Cerfa 11823) et un règlement, ou une participation gratuite possible.
 - **Soignants et familles d'accueil** : autorisation écrite de chaque personne avant publication.
-- **Modèle 3D** : remplacer `assets/imoca.glb` par la version à jour du bateau (déco actuelle) ; vérifier ensuite la position de la plaque du cockpit (`mat.json` → `cockpit`).
+- **Modèle 3D** : fait (déco 2026). Pour un nouveau fichier d'Ulysse, le déposer en `assets/imoca.glb` : le site reconnaît les pièces nommées et recale le modèle. Vérifier la plaque du cockpit (`mat.json` → `cockpit`).
 - **Autocollants** : taille (rangées de 2,2 cm, lettres d'environ 1 cm), tenue sur le carbone, poids et pose à valider avec l'équipe technique.
 
 ## Tester sur son ordinateur
@@ -87,3 +88,11 @@ Pour le parrainage en production, la réservation envoie aussi `par` (le slug du
 python3 -m http.server 8000
 ```
 puis ouvrir http://localhost:8000.
+
+## Ajouts du 13 novembre
+
+- **Tout en « tu »** sur le site.
+- **Boutique solidaire** : https://alexolivier.fr/109-boutique-initiatives-coeur (`boutique_url`).
+- **Cockpit, déco « portraits » (essai)** : sur la cloison blanche, deux portraits d'enfants tissés avec les noms des donateurs du cockpit (graisse, corps et couleur suivent l'image), et au centre les emplacements réservés aux logos (Mécénat Chirurgie Cardiaque, Initiatives-Cœur, partenaires). Le bouton « Grille » montre les places ; le choix d'une place se fait toujours sur la grille. Toucher un nom ouvre la fiche du donateur.
+- **Places libres habillées** : sur le mât et dans le cockpit, les cases libres affichent des cœurs pâles, des portraits d'enfants et de courtes phrases, en attendant les noms.
+- **Personnalités** : bios complétées (à faire valider, surtout Constance Schaerer et Nouchka Simic), visuels génériques.

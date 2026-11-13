@@ -104,7 +104,6 @@
    "lat": 12.639,
    "lon": -8.003,
    "photo": "enfants/551.jpg",
-   "photo_illustration": true,
    "hop_lat": 47.218,
    "hop_lon": -1.554,
    "equipe": [
@@ -113,12 +112,13 @@
     "chir-nantes",
     "inf-nantes",
     "accueil-551"
-   ]
+   ],
+   "photo_demo": true
   },
   {
    "num": 552,
    "prenom": "Moussa",
-   "age": 7,
+   "age": 9,
    "pays": "Sénégal",
    "iso": "686",
    "ville": "Thiès",
@@ -135,7 +135,6 @@
    "lat": 14.791,
    "lon": -16.936,
    "photo": "enfants/552.jpg",
-   "photo_illustration": true,
    "hop_lat": 45.764,
    "hop_lon": 4.836,
    "equipe": [
@@ -144,12 +143,13 @@
     "chir-lyon",
     "anest-lyon",
     "accueil-552"
-   ]
+   ],
+   "photo_demo": true
   },
   {
    "num": 553,
    "prenom": "Fanja",
-   "age": 2,
+   "age": 1,
    "pays": "Madagascar",
    "iso": "450",
    "ville": "Antananarivo",
@@ -166,7 +166,6 @@
    "lat": -18.879,
    "lon": 47.508,
    "photo": "enfants/553.jpg",
-   "photo_illustration": true,
    "hop_lat": 48.857,
    "hop_lon": 2.352,
    "equipe": [
@@ -175,7 +174,8 @@
     "chir-paris",
     "inf-paris",
     "accueil-553"
-   ]
+   ],
+   "photo_demo": true
   },
   {
    "num": 554,
@@ -197,7 +197,6 @@
    "lat": 7.691,
    "lon": -5.03,
    "photo": "enfants/554.jpg",
-   "photo_illustration": true,
    "hop_lat": 44.838,
    "hop_lon": -0.579,
    "equipe": [
@@ -205,17 +204,18 @@
     "cardio-bordeaux",
     "chir-bordeaux",
     "accueil-554"
-   ]
+   ],
+   "photo_demo": true
   },
   {
    "num": 555,
    "prenom": "Stevenson",
-   "age": 5,
+   "age": 2,
    "pays": "Haïti",
    "iso": "332",
    "ville": "Port-au-Prince",
-   "patho": "Transposition des gros vaisseaux",
-   "simple": "Les deux grosses artères qui sortent du cœur sont inversées.",
+   "patho": "Coarctation de l'aorte",
+   "simple": "L'aorte, la grosse artère qui part du cœur, est rétrécie : le sang passe mal vers le bas du corps.",
    "accueil": "Toulouse",
    "hopital": "Toulouse",
    "arrivee": "2027-01-11",
@@ -227,7 +227,6 @@
    "lat": 18.594,
    "lon": -72.307,
    "photo": "enfants/555.jpg",
-   "photo_illustration": true,
    "hop_lat": 43.605,
    "hop_lon": 1.444,
    "equipe": [
@@ -236,12 +235,13 @@
     "chir-toulouse",
     "anest-toulouse",
     "accueil-555"
-   ]
+   ],
+   "photo_demo": true
   },
   {
    "num": 556,
    "prenom": "Mariam",
-   "age": 6,
+   "age": 14,
    "pays": "Burkina Faso",
    "iso": "854",
    "ville": "Bobo-Dioulasso",
@@ -258,7 +258,6 @@
    "lat": 11.177,
    "lon": -4.298,
    "photo": "enfants/556.jpg",
-   "photo_illustration": true,
    "hop_lat": 48.117,
    "hop_lon": -1.678,
    "equipe": [
@@ -266,12 +265,13 @@
     "cardio-rennes",
     "chir-rennes",
     "accueil-556"
-   ]
+   ],
+   "photo_demo": true
   },
   {
    "num": 557,
    "prenom": "Hawa",
-   "age": 3,
+   "age": 0.7,
    "pays": "Guinée",
    "iso": "324",
    "ville": "Conakry",
@@ -288,7 +288,6 @@
    "lat": 9.641,
    "lon": -13.578,
    "photo": "enfants/557.jpg",
-   "photo_illustration": true,
    "hop_lat": 50.629,
    "hop_lon": 3.057,
    "equipe": [
@@ -296,12 +295,13 @@
     "cardio-lille",
     "chir-lille",
     "accueil-557"
-   ]
+   ],
+   "photo_demo": true
   },
   {
    "num": 558,
    "prenom": "Yacine",
-   "age": 8,
+   "age": 12,
    "pays": "Mauritanie",
    "iso": "478",
    "ville": "Nouakchott",
@@ -318,7 +318,6 @@
    "lat": 18.074,
    "lon": -15.958,
    "photo": "enfants/558.jpg",
-   "photo_illustration": true,
    "hop_lat": 43.297,
    "hop_lon": 5.37,
    "equipe": [
@@ -327,7 +326,8 @@
     "chir-marseille",
     "inf-marseille",
     "accueil-558"
-   ]
+   ],
+   "photo_demo": true
   }
  ],
  "collecte": 84985,

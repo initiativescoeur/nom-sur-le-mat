@@ -1,4 +1,4 @@
-/* Votre nom sur le mât — Initiatives-Cœur
+/* Ton nom sur le mât — Initiatives-Cœur
    Mât 3D interactif (modèle réel du bateau), plan des places, parcours de don, base de la générosité. */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -202,12 +202,22 @@ const BOAT_SPEED = 5.5;                       // m/s (≈ 11 nœuds) : la mer d�
 const rig = new THREE.Group(); scene.add(rig);
 const boat = new THREE.Group(); rig.add(boat); rig.add(camera);
 
-// --- modèle du bateau (visite virtuelle) : on retire le fût d'origine (très simplifié) et on pose le mât lissé
+// --- modèle du bateau (visite 3D d'Ulysse, déco 2026) : on retire le fût d'origine (très simplifié) et on pose le mât lissé
 let gltf;
 try { gltf = await new GLTFLoader().loadAsync('assets/imoca.glb', ev => { if (ev.total) $('loading').querySelector('span').textContent = `Le bateau arrive au ponton… ${Math.round(ev.loaded / ev.total * 100)} %`; }); }
 catch (e) {   // hébergeurs qui refusent le format .glb : copie du modèle encodée dans un module JavaScript
   const b64 = (await import('./assets/imoca-glb.js')).default, bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
   gltf = await new GLTFLoader().parseAsync(bin.buffer, '');
+}
+// modèle 2026 (déco actuelle, pièces nommées) : grand-voile haute et J0 du même bord, foil sous le vent baissé,
+// les autres voiles (ris, J2-J4, gennakers, spi) masquées ; recalé sur le repère de l'ancien modèle (mât, cockpit, plaques)
+{
+  let named = false; gltf.scene.traverse(o => { if (o.name === 'sail_MS_R') named = true; });
+  if (named) {
+    const SHOW = new Set(['sail_MS_R', 'sail_J0_R', 'foils_L_down', 'foils_R_up', 'fin_L_down', 'fin_R_down', 'boat_stick_M']), VAR = /^(sail_|foils_|fin_|boat_stick_)/;
+    gltf.scene.traverse(o => { if (VAR.test(o.name)) o.visible = SHOW.has(o.name); });
+    gltf.scene.position.set(-0.030, 0.3956, 0.3747);
+  }
 }
 gltf.scene.updateMatrixWorld(true);
 gltf.scene.traverse(o => {
@@ -326,6 +336,30 @@ function fitName(ctx, o, maxW, rowPx, bold) {
   const w2 = Math.max(ctx.measureText(o.p).width, ctx.measureText(o.n).width);
   return { lines: [o.p, o.n], size: rowPx * 0.40 * Math.min(1, maxW / w2) };
 }
+// places libres : en attendant un nom, on les habille (cœurs pâles, portraits d'enfants, petites phrases) pour que le mât ne paraisse pas vide
+function FILL_TXT() { return FILL_TXT.v || (FILL_TXT.v = ['Bon vent Violette !', 'Chaque don compte', 'Un cœur, un enfant', 'Tous dans le même bateau', "Cap sur l'espoir", "Merci d'être à bord", 'Pour les enfants du monde', 'Ton nom ici ?', 'Ensemble, plus loin', 'Le cœur au large']); }
+function KIDIMG() {
+  if (!KIDIMG.v) KIDIMG.v = ENF.enfants.filter(k => k.photo).map(k => { const im = new Image(); im.onload = () => { clearTimeout(KIDIMG.t); KIDIMG.t = setTimeout(() => { try { redrawAll(); drawCk(); } catch (e) {} }, 400); }; im.src = k.photo; return im; });
+  return KIDIMG.v;
+}
+function fhash(n) { let x = Math.imul(n + 0x9e37, 2654435761) >>> 0; x ^= x >>> 13; x = Math.imul(x, 0x5bd1e995) >>> 0; return (x ^ (x >>> 15)) >>> 0; }
+function drawFiller(ctx, key, x0, x1, yc, rowPx, hi) {
+  const h = fhash(key), k = h % 100, cx = (x0 + x1) / 2, cw = x1 - x0;
+  if (!hi) { if (k < 60) { ctx.fillStyle = 'rgba(206,17,30,.16)'; heartPath(ctx, cx, yc, rowPx * .5); ctx.fill(); } return; }
+  const KI = KIDIMG();
+  if (k >= 44 && k < 64 && KI.length) {
+    const im = KI[(h >>> 8) % KI.length];
+    if (im.complete && im.naturalWidth) { const r = rowPx * .4, S = im.naturalWidth * .62, sx = im.naturalWidth * .5 - S / 2, sy = im.naturalHeight * .44 - S / 2;
+      ctx.save(); ctx.globalAlpha = .6; ctx.beginPath(); ctx.arc(cx, yc, r, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(im, sx, sy, S, S, cx - r, yc - r, 2 * r, 2 * r); ctx.restore();
+      ctx.strokeStyle = 'rgba(206,17,30,.3)'; ctx.lineWidth = Math.max(1, rowPx * .035); ctx.beginPath(); ctx.arc(cx, yc, r, 0, Math.PI * 2); ctx.stroke(); return; }
+  }
+  if (k >= 64) {
+    const FT = FILL_TXT(), txt = FT[(h >>> 4) % FT.length]; let size = rowPx * .4; ctx.font = `italic 500 ${size}px ${STICK_FONT}`;
+    const tw = ctx.measureText(txt).width; if (tw > cw * .88) { size *= cw * .88 / tw; ctx.font = `italic 500 ${size}px ${STICK_FONT}`; }
+    ctx.fillStyle = txt === 'Ton nom ici ?' ? 'rgba(43,150,98,.75)' : 'rgba(110,122,138,.72)'; ctx.fillText(txt, cx, yc + size * .05); return;
+  }
+  ctx.fillStyle = 'rgba(206,17,30,.2)'; heartPath(ctx, cx, yc, rowPx * .6); ctx.fill();
+}
 function drawTile(t, cv, TXD, hi) {
   const ctx = cv.getContext('2d'), W = cv.width, H = cv.height, su = t.f === 0 ? 1 : -1;
   const xOf = sig => (0.5 + su * sig / TEXW) * W, yOf = s => (t.sHi - s) * TXD, rowPx = PITCH * TXD;
@@ -383,7 +417,7 @@ function drawTile(t, cv, TXD, hi) {
         if (hi) { ctx.beginPath(); ctx.roundRect(x0 + rowPx * .12, yc - rowPx * .36, x1 - x0 - rowPx * .24, rowPx * .72, rowPx * .2); ctx.stroke(); }
         else { ctx.fillStyle = 'rgba(43,182,115,.55)'; ctx.fillRect(x0 + 1, yc - rowPx * .3, x1 - x0 - 2, rowPx * .6); }
         ctx.setLineDash([]);
-      }
+      } else drawFiller(ctx, sl, x0, x1, yc, rowPx, hi);
     }
   }
 }
@@ -494,14 +528,102 @@ const ckFrame = new THREE.Mesh(new THREE.BoxGeometry(CK.w + 0.05, CK.h + 0.05, 0
 ckFrame.position.set(CK.cx, CK.cy, CK.z + 0.012); boat.add(ckFrame);
 const ckLamp = new THREE.PointLight(0xfff1dd, 2.2, 3.2, 1.6); ckLamp.position.set(CK.cx, CK.cy + 0.55, CK.z - 0.9); boat.add(ckLamp);
 const ckHeadPx = () => ckCanvas.height * CK.head / CK.h, ckRowPx = () => (ckCanvas.height - ckHeadPx() - ckCanvas.height * 0.012) / CK.rows, ckColPx = () => ckCanvas.width / CK.cols;
-let ckSel = -1;
-function drawCk() {
-  const ctx = ckCanvas.getContext('2d'), W = ckCanvas.width, H = ckCanvas.height, hp = ckHeadPx(), rp = ckRowPx(), cp = ckColPx();
-  ctx.fillStyle = '#f7f6f2'; ctx.fillRect(0, 0, W, H);
+/* --- déco « portraits » (essai) : sur la cloison blanche, deux portraits d'enfants tissés avec les noms des donateurs du cockpit,
+   corps, graisse et couleur variant avec l'image ; au centre, les emplacements réservés aux logos (Mécénat Chirurgie Cardiaque, partenaires) */
+let ckDeco = 'portraits', typoHits = [], typoHome = new Map();
+const ckTypoOn = () => ckDeco === 'portraits' && !(pickMode && DS.zone === 'ck');
+const TYPO_KIDS = [{ num: 553, pal: ['#2e0207', '#c20f1b', '#f7c9cc'], bg: '#e9e1de' }, { num: 556, pal: ['#060f24', '#1d4b9e', '#bcd0f2'], bg: '#e1e5ec' }];
+TYPO_KIDS.forEach(k => { k.img = new Image(); k.img.onload = () => { try { drawCk(); } catch (e) {} }; k.img.src = `enfants/typo/${k.num}.png`; });
+Promise.all([300, 500, 800].map(w => new FontFace('Barlow Condensed', `url(fonts/barlow-condensed-latin-${w}-normal.woff2)`, { weight: String(w) }).load().then(f => document.fonts.add(f)).catch(() => {})))
+  .then(() => { try { drawCk(); } catch (e) {} });
+const hex3 = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+function drawCkHead(ctx, W, hp) {
   ctx.fillStyle = '#ce111e'; ctx.fillRect(0, 0, W, hp);
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `700 ${hp * 0.5}px ${STICK_FONT}`;
   ctx.fillText("ILS NAVIGUENT AVEC VIOLETTE  ·  COCKPIT D'INITIATIVES-CŒUR", W / 2, hp * 0.54);
   heartPath(ctx, hp * 0.62, hp * 0.52, hp * 0.62); ctx.fill(); heartPath(ctx, W - hp * 0.62, hp * 0.52, hp * 0.62); ctx.fill();
+}
+function typoPortrait(ctx, kid, X, Y, w, h, names, start, k) {
+  w = Math.floor(w); h = Math.floor(h);
+  const img = kid.img, ok = img && img.complete && img.naturalWidth, fs = Math.max(13.5 * k, 10), lh = fs * 1.02, q = 4;
+  let fit = null; if (ok) { const sc = Math.min(w * 1.08 / img.naturalWidth, h * 0.97 / img.naturalHeight); fit = { w: img.naturalWidth * sc, h: img.naturalHeight * sc }; fit.x = (w - fit.w) / 2; fit.y = h - fit.h; }
+  // l'image, réduite, sert à lire la densité sous chaque nom
+  const S = document.createElement('canvas'); S.width = Math.ceil(w / q); S.height = Math.ceil(h / q); const sx = S.getContext('2d', { willReadFrequently: true });
+  if (fit) sx.drawImage(img, fit.x / q, fit.y / q, fit.w / q, fit.h / q);
+  const px = sx.getImageData(0, 0, S.width, S.height).data;
+  const dark = (x, y) => { const i = (clamp(y / q | 0, 0, S.height - 1) * S.width + clamp(x / q | 0, 0, S.width - 1)) * 4; if (px[i + 3] < 128) return -1; return 1 - (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255; };
+  // les noms, en noir : graisse et corps selon la densité
+  const T = document.createElement('canvas'); T.width = w; T.height = h; const t = T.getContext('2d'); t.textBaseline = 'alphabetic'; t.fillStyle = '#000'; t.textAlign = 'left';
+  let n = start, y = lh * 0.86, line = 0;
+  while (y < h + fs && names.length) {
+    let x = -(((line * 37) % 23) / 23) * 90 * k; line++;
+    while (x < w) {
+      const i = names[n % names.length]; n++; const o = D[i], txt = o.p + ' ' + o.n;
+      t.font = `500 ${fs}px ${STICK_FONT}`; const w0 = t.measureText(txt).width; let sum = 0, cnt = 0;
+      for (let j = 0; j <= 4; j++) { const d = dark(x + w0 * j / 4, y - fs * 0.35); if (d >= 0) { sum += d; cnt++; } }
+      const d = cnt >= 3 ? sum / cnt : -1, wt = d < 0.25 ? 300 : d < 0.45 ? 500 : d < 0.62 ? 700 : 800, size = fs * (d < 0 ? 0.9 : 0.94 + 0.16 * d);
+      t.font = `${wt} ${size}px ${STICK_FONT}`; const ww = t.measureText(txt).width; t.fillText(txt, x, y);
+      if (d >= 0.62) { t.lineWidth = size * 0.07; t.strokeStyle = '#000'; t.strokeText(txt, x, y); }
+      const x0 = Math.max(0, x), x1 = Math.min(w, x + ww);
+      if (x1 - x0 > ww * 0.6 && y < h) typoHits.push({ x0: X + x0, y0: Y + y - size * 0.82, x1: X + x1, y1: Y + y + size * 0.22, i, d, full: x0 === x && x1 === x + ww });
+      x += ww; t.font = `300 ${fs}px ${STICK_FONT}`; t.fillText('  ·  ', x, y); x += t.measureText('  ·  ').width;
+    }
+    y += lh;
+  }
+  // couleur : le portrait en bichromie, posé « à travers » les lettres
+  const C = document.createElement('canvas'); C.width = w; C.height = h; const c = C.getContext('2d'); c.fillStyle = kid.bg; c.fillRect(0, 0, w, h);
+  if (fit) {
+    const P = document.createElement('canvas'); P.width = Math.ceil(fit.w / 2); P.height = Math.ceil(fit.h / 2); const pc = P.getContext('2d', { willReadFrequently: true });
+    pc.drawImage(img, 0, 0, P.width, P.height); const im = pc.getImageData(0, 0, P.width, P.height), a = im.data, [c0, c1, c2] = kid.pal.map(hex3), bg = hex3(kid.bg);
+    for (let i = 0; i < a.length; i += 4) {
+      const L0 = clamp(((0.2126 * a[i] + 0.7152 * a[i + 1] + 0.0722 * a[i + 2]) / 255 - 0.1) / 0.72, 0, 1), L = L0 * L0 * (3 - 2 * L0), A = a[i + 3] / 255, lo = L < 0.5, f = lo ? L / 0.5 : (L - 0.5) / 0.5, u = lo ? c0 : c1, v = lo ? c1 : c2;
+      for (let j = 0; j < 3; j++) a[i + j] = (u[j] + (v[j] - u[j]) * f) * A + bg[j] * (1 - A);
+      a[i + 3] = 255;
+    }
+    pc.putImageData(im, 0, 0); c.imageSmoothingQuality = 'high'; c.drawImage(P, fit.x, fit.y, fit.w, fit.h);
+  }
+  t.globalCompositeOperation = 'source-in'; t.drawImage(C, 0, 0); t.globalCompositeOperation = 'source-over';
+  ctx.drawImage(T, X, Y);
+  // légende
+  const e = ENF.enfants.find(x => x.num === kid.num); if (!e) return;
+  const cs = 30 * k, label = `${e.prenom} · ${e.pays}`; ctx.font = `800 ${cs}px ${STICK_FONT}`; const lw = ctx.measureText(label).width; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`;
+  const sub = 'portrait tissé avec les noms des donateurs du cockpit', sw = ctx.measureText(sub).width, bw = Math.max(lw, sw) + cs * 1.2, bh = cs * 2.2;
+  ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.beginPath(); ctx.roundRect(X + cs * 0.4, Y + cs * 0.4, bw, bh, cs * 0.4); ctx.fill();
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = kid.pal[1]; ctx.font = `800 ${cs}px ${STICK_FONT}`; ctx.fillText(label, X + cs, Y + cs * 1.45);
+  ctx.fillStyle = '#5b6573'; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; ctx.fillText(sub, X + cs, Y + cs * 2.15);
+}
+function typoLogos(ctx, X, Y, w, h, k) {
+  const card = (x, y, cw, ch, title, sub, main) => {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 18 * k); ctx.fill();
+    ctx.setLineDash([16 * k, 10 * k]); ctx.lineWidth = 4 * k; ctx.strokeStyle = main ? 'rgba(206,17,30,.75)' : 'rgba(19,41,75,.32)'; ctx.stroke(); ctx.setLineDash([]);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const ts = Math.min(ch * 0.2, cw * 0.11) * (main ? 1 : 0.9);
+    if (main) { ctx.fillStyle = '#ce111e'; heartPath(ctx, x + cw / 2, y + ch * 0.3, ch * 0.22); ctx.fill(); }
+    ctx.fillStyle = main ? '#13294b' : '#3c4a5e'; ctx.font = `800 ${ts}px ${STICK_FONT}`; ctx.fillText(title, x + cw / 2, y + ch * (main ? 0.62 : 0.44));
+    ctx.fillStyle = '#8a93a0'; ctx.font = `500 ${ts * 0.58}px ${STICK_FONT}`; ctx.fillText(sub, x + cw / 2, y + ch * (main ? 0.8 : 0.7));
+  };
+  const g = 22 * k; let y = Y;
+  card(X, y, w, h * 0.34, 'Mécénat Chirurgie Cardiaque', 'logo · emplacement prioritaire', true); y += h * 0.34 + g;
+  card(X, y, w, h * 0.15, 'Initiatives-Cœur', 'logo', false); y += h * 0.15 + g;
+  const pw = (w - g) / 2, ph = (Y + h - y - g * 2) / 3;
+  for (let r = 0; r < 3; r++) for (let cI = 0; cI < 2; cI++) card(X + cI * (pw + g), y + r * (ph + g), pw, ph, 'Partenaire', 'logo', false);
+}
+function drawCkTypo() {
+  const ctx = ckCanvas.getContext('2d'), W = ckCanvas.width, H = ckCanvas.height, hp = ckHeadPx(), k = W / 4096;
+  ctx.fillStyle = '#f7f6f2'; ctx.fillRect(0, 0, W, H); drawCkHead(ctx, W, hp);
+  const pad = 40 * k, top = hp + pad, h = H - top - pad, midW = 900 * k, pw = (W - midW - pad * 4) / 2;
+  const names = []; for (let c = 0; c < CK.n; c++) if (ckOwner[c] >= 0) names.push(ckOwner[c]);
+  typoHits = []; typoHome = new Map();
+  typoPortrait(ctx, TYPO_KIDS[0], pad, top, pw, h, names, 0, k);
+  typoPortrait(ctx, TYPO_KIDS[1], W - pad - pw, top, pw, h, names, Math.floor(names.length / 2), k);
+  typoLogos(ctx, pad * 2 + pw, top, midW, h, k);
+  for (const r of typoHits) { const cur = typoHome.get(r.i); if (!cur || (r.full && !cur.full) || (r.full === cur.full && r.d > cur.d)) typoHome.set(r.i, r); }
+  ckTex.needsUpdate = true; dirty = true;
+}
+let ckSel = -1;
+function drawCk() {
+  if (ckTypoOn()) return drawCkTypo();
+  const ctx = ckCanvas.getContext('2d'), W = ckCanvas.width, H = ckCanvas.height, hp = ckHeadPx(), rp = ckRowPx(), cp = ckColPx();
+  ctx.fillStyle = '#f7f6f2'; ctx.fillRect(0, 0, W, H); drawCkHead(ctx, W, hp);
   for (let c = 0; c < CK.n; c++) {
     const col = c % CK.cols, row = Math.floor(c / CK.cols), x = col * cp, y = hp + row * rp, i = ckOwner[c];
     if (pickMode && DS.zone === 'ck') { ctx.fillStyle = c === ckSel ? '#ffd9db' : i < 0 ? '#d9f3e4' : '#f7f6f2'; ctx.fillRect(x + 2, y + 1, cp - 4, rp - 2); }
@@ -509,7 +631,8 @@ function drawCk() {
     if (i >= 0) { const o = D[i], fit = fitName(ctx, o, cp * 0.9, rp, false); ctx.fillStyle = '#13294b'; ctx.font = `600 ${fit.size}px ${STICK_FONT}`;
       if (fit.lines.length === 1) ctx.fillText(fit.lines[0], x + cp / 2, y + rp / 2 + fit.size * .04);
       else { ctx.fillText(fit.lines[0], x + cp / 2, y + rp / 2 - fit.size * .5); ctx.fillText(fit.lines[1], x + cp / 2, y + rp / 2 + fit.size * .55); } }
-    else if (c === ckSel) { ctx.fillStyle = '#ce111e'; ctx.font = `700 ${rp * 0.5}px ${STICK_FONT}`; ctx.fillText('VOTRE NOM ICI', x + cp / 2, y + rp / 2); }
+    else if (c === ckSel) { ctx.fillStyle = '#ce111e'; ctx.font = `700 ${rp * 0.5}px ${STICK_FONT}`; ctx.fillText('TON NOM ICI', x + cp / 2, y + rp / 2); }
+    else if (!(pickMode && DS.zone === 'ck')) drawFiller(ctx, 100000 + c, x + cp * .04, x + cp * .96, y + rp / 2, rp, true);
   }
   ctx.strokeStyle = 'rgba(19,41,75,.12)'; ctx.lineWidth = Math.max(1, W / 2000);
   for (let col = 1; col < CK.cols; col++) { ctx.beginPath(); ctx.moveTo(col * cp, hp); ctx.lineTo(col * cp, H); ctx.stroke(); }
@@ -517,7 +640,9 @@ function drawCk() {
 }
 // position (repère de la plaque, x vers la droite vue depuis l'arrière, y vers le haut) → repère du bateau
 const ckLocal = (u, v) => new THREE.Vector3(CK.cx - (u - 0.5) * CK.w, CK.cy + (0.5 - v) * CK.h, CK.z);   // u, v ∈ [0, 1], v vers le bas
-function ckCellUV(c) { const col = c % CK.cols, row = Math.floor(c / CK.cols), H = ckCanvas.height, hp = ckHeadPx(), rp = ckRowPx();
+function ckCellUV(c) {
+  if (ckTypoOn() && ckOwner[c] >= 0 && typoHome.has(ckOwner[c])) { const r = typoHome.get(ckOwner[c]), W = ckCanvas.width, H = ckCanvas.height; return { u0: r.x0 / W, u1: r.x1 / W, v0: r.y0 / H, v1: r.y1 / H }; }
+  const col = c % CK.cols, row = Math.floor(c / CK.cols), H = ckCanvas.height, hp = ckHeadPx(), rp = ckRowPx();
   return { u0: col / CK.cols, u1: (col + 1) / CK.cols, v0: (hp + row * rp) / H, v1: (hp + (row + 1) * rp) / H }; }
 function ckRect(c) {
   rig.updateMatrixWorld(); camera.updateMatrixWorld(); const q = ckCellUV(c), r = stage.getBoundingClientRect(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
@@ -529,7 +654,9 @@ function ckPick(cx, cy) {
   const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
   rig.updateMatrixWorld(); camera.updateMatrixWorld(); ray.setFromCamera(_ndc, camera);
   const hit = ray.intersectObject(ckMesh, false)[0]; if (!hit || !hit.uv) return null;
-  const px = hit.uv.x * ckCanvas.width, py = (1 - hit.uv.y) * ckCanvas.height, row = Math.floor((py - ckHeadPx()) / ckRowPx()), col = Math.floor(px / ckColPx());
+  const px = hit.uv.x * ckCanvas.width, py = (1 - hit.uv.y) * ckCanvas.height;
+  if (ckTypoOn()) { const r = typoHits.find(r => px >= r.x0 && px <= r.x1 && py >= r.y0 && py <= r.y1); return r ? D[r.i].ck : null; }
+  const row = Math.floor((py - ckHeadPx()) / ckRowPx()), col = Math.floor(px / ckColPx());
   if (row < 0 || row >= CK.rows || col < 0 || col >= CK.cols) return null; return row * CK.cols + col;
 }
 const ckCellCenter = c => { const q = ckCellUV(c); return { x: ((q.u0 + q.u1) / 2 - 0.5) * CK.w, y: (0.5 - (q.v0 + q.v1) / 2) * CK.h }; };
@@ -584,7 +711,7 @@ async function travelCk(o) {
   const my = ++token; current = o; audioInit(); spotSlot = -1; spotCk = -1; $('spot').classList.remove('show', 'pick'); hideTip();
   setView('travel'); $('climbWho').textContent = o.p + ' ' + o.n; $('alti').classList.remove('armed');
   const c = ckCellCenter(o.ck); if (!await enterCockpit(c.x, c.y, ckCloseD(), my) || my !== token) return;
-  spotCk = o.ck; $('spotTxt').textContent = (o.local ? 'Vous êtes ici' : o.p + ' est ici') + ' · cockpit'; $('spot').classList.add('show'); dirty = true;
+  spotCk = o.ck; $('spotTxt').textContent = (o.local ? 'Tu es ici' : o.p + ' est ici') + ' · cockpit'; $('spot').classList.add('show'); dirty = true;
   renderDone(o); setTimeout(() => { if (my === token) setView('done'); }, reduce ? 0 : 500);
   try { history.replaceState(null, '', '#' + o.slug); } catch (e) {}
 }
@@ -603,8 +730,17 @@ function showTipRect(r, html) {
 }
 function selectCk(c) { if (c < 0 || ckOwner[c] >= 0) return; DS.ck = c; ckSel = c; drawCk(); const cc = ckCellCenter(c);
   if (!ck.on) enterCockpit(cc.x, cc.y, ckCloseD()); else { ck.tx = cc.x; ck.ty = cc.y; ck.td = ckCloseD(); }
-  spotCk = c; $('spotTxt').textContent = 'Votre place · cockpit'; $('spot').classList.add('show', 'pick'); renderPlace(); }
-$('btnCk').onclick = async () => { if (ck.on) { spotCk = -1; await leaveCockpit(); } else { spotSlot = -1; enterCockpit(0, 0, isMobile() ? 1.9 : 1.5); } };
+  spotCk = c; $('spotTxt').textContent = 'Ta place · cockpit'; $('spot').classList.add('show', 'pick'); renderPlace(); }
+$('btnDeco').onclick = () => { ckDeco = ckDeco === 'portraits' ? 'grille' : 'portraits'; $('decoTxt').textContent = ckDeco === 'portraits' ? 'Grille' : 'Portraits'; hideTip(); drawCk();
+  if (spotCk >= 0) { const cc = ckCellCenter(spotCk); ck.tx = cc.x; ck.ty = cc.y; } };
+// cadrage à l'entrée du cockpit : en déco « portraits », toute la cloison (écran large) ou le premier portrait (téléphone)
+function ckEntry() {
+  const a = stage.clientWidth / Math.max(1, stage.clientHeight), t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  if (!ckTypoOn()) return { x: 0, d: isMobile() ? 1.9 : 1.5 };
+  if (a >= 1.1) return { x: 0, d: clamp(CK.w * 0.54 / (t * a), 1.2, 2.6) };
+  return { x: -0.575, d: clamp(0.4 / (t * a), 1.2, 2.6) };
+}
+$('btnCk').onclick = async () => { if (ck.on) { spotCk = -1; await leaveCockpit(); } else { spotSlot = -1; const e = ckEntry(); enterCockpit(e.x, 0, e.d); } };
 
 function pickAt(cx, cy) {
   const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
@@ -794,7 +930,7 @@ async function travel(o, { fromFoot = false } = {}) {
   if (fromFoot) { nav.s = nav.ts = 1.0; nav.td = nav.d = Math.max(nav.d, 1.4); dirty = true; await sleep(250); }
   const ok = await glideTo(sT, f === 0 ? 0 : Math.PI, closeD(), my);
   if (!ok || my !== token) return;
-  spotSlot = o.slot; spotWhole = o.perso >= 0; $('spotTxt').textContent = (o.perso >= 0 ? o.p + ' est ici · ' : 'Vous êtes ici · ') + fmtM(hOf(sT));
+  spotSlot = o.slot; spotWhole = o.perso >= 0; $('spotTxt').textContent = (o.perso >= 0 ? o.p + ' est ici · ' : 'Tu es ici · ') + fmtM(hOf(sT));
   $('spot').classList.add('show'); dirty = true;
   renderDone(o);
   setTimeout(() => { if (my === token) { setView('done'); requestAnimationFrame(() => { if (my === token) nav.td = closeD(); }); } }, reduce ? 0 : 500);
@@ -888,12 +1024,12 @@ function go(o) { if (document.activeElement && document.activeElement.blur) docu
 $('form').addEventListener('submit', ev => {
   ev.preventDefault(); audioInit();
   const p = $('prenom').value.trim(), n = $('nom').value.trim();
-  if (!p || !n) { showMsg('Saisissez votre <strong>prénom</strong> et votre <strong>nom</strong>, tels que vous les avez indiqués lors de votre don.'); (p ? $('nom') : $('prenom')).focus(); return; }
+  if (!p || !n) { showMsg('Saisis ton <strong>prénom</strong> et ton <strong>nom</strong>, tels que tu les as indiqués lors de ton don.'); (p ? $('nom') : $('prenom')).focus(); return; }
   const r = search(p, n);
   if (r.hits.length === 1) return go(r.hits[0]);
-  if (r.hits.length > 1) return showMsg(`${r.hits.length} personnes s'appellent <strong>${esc(r.hits[0].p + ' ' + r.hits[0].n)}</strong> sur le mât. Laquelle êtes-vous ?`,
+  if (r.hits.length > 1) return showMsg(`${r.hits.length} personnes s'appellent <strong>${esc(r.hits[0].p + ' ' + r.hits[0].n)}</strong> sur le mât. Laquelle est la tienne ?`,
     r.hits.map(o => [`${FACEN[dec(o.slot).f]} · ${fmtM(hOf(rowS(dec(o.slot).row)))}${o.v >= 0 ? ' · ' + VILLES[o.v] : ''}`, () => go(o)]));
-  if (r.close.length) return showMsg(`Nous ne trouvons pas <strong>${esc(p + ' ' + n)}</strong>. Vouliez-vous dire :`, r.close.map(o => [o.p + ' ' + o.n, () => go(o)]));
+  if (r.close.length) return showMsg(`Nous ne trouvons pas <strong>${esc(p + ' ' + n)}</strong>. Voulais-tu dire :`, r.close.map(o => [o.p + ' ' + o.n, () => go(o)]));
   showMsg(`<strong>${esc(p + ' ' + n)}</strong> n'est pas encore sur le mât.`, [['Mettre ce nom sur le mât', () => { startDon(); $('dPrenom').value = p; $('dNom').value = n; }]]);
 });
 function chip(label, cls, fn, href) {
@@ -941,12 +1077,13 @@ function kidSteps(k) {
   return L.map(([done, txt], j) => `<li class="${done ? 'ok' : j === firstTodo ? 'now' : ''}">${esc(txt)}</li>`).join('');
 }
 const avatarFor = (txt, col) => `<div class="avatar" style="background:${col}">${esc(txt)}</div>`;
+const ageTxt = k => k.age < 1 ? `${Math.max(1, Math.round(k.age * 12))} mois` : k.age < 2 ? '1 an' : `${Math.floor(k.age)} ans`;
 const kidAvatar = (k, cls = '') => k.photo ? `<div class="avatar ${cls}" style="background:#b8323a"><img src="${esc(k.photo)}" alt="" loading="lazy" onerror="this.remove()"><span>${esc(k.prenom[0])}</span></div>` : avatarFor(k.prenom[0], '#b8323a');
 // lien vers la fiche d'un donateur (prénom seul par défaut)
 const donLink = (o, txt) => `<a class="dn" href="#fiche-${esc(o.slug)}" data-don="${o.i}" title="${esc(o.p + ' ' + o.n + (o.v >= 0 ? ' · ' + VILLES[o.v] : ''))}">${esc(txt ?? o.p)}</a>`;
 document.addEventListener('click', e => { const a = e.target.closest('[data-don]'); if (!a) return; e.preventDefault(); const o = D[+a.dataset.don]; if (o) openDonor(o); });
 function kidCard(k, compact) {
-  return `<div class="top">${kidAvatar(k)}<div><small>Enfant n° ${k.num} · fiche fictive</small><h3>${esc(k.prenom)}, ${k.age} ans</h3><p>${esc(k.ville)}, ${esc(k.pays)}</p></div></div>
+  return `<div class="top">${kidAvatar(k)}<div><small>Enfant n° ${k.num} · fiche fictive</small><h3>${esc(k.prenom)}, ${ageTxt(k)}</h3><p>${esc(k.ville)}, ${esc(k.pays)}</p></div></div>
     <p><b>${esc(kidStatus(k))}</b></p><div class="prog"><i style="width:${Math.round(k.finance * 100)}%"></i></div>
     ${compact ? '' : `<p>${esc(k.patho)} : ${esc(k.simple)}</p><ul class="timeline">${kidSteps(k)}</ul>`}`;
 }
@@ -963,18 +1100,18 @@ function renderDone(o) {
   const q = $('tQuote'); q.hidden = !o.m; q.innerHTML = o.m ? `« ${esc(o.m)} »<small>${o.local ? 'En attente de validation avant affichage public' : 'Message laissé lors du don'}${o.d ? ' · ' + fdate(o.d) : ''}</small>` : '';
   const pc = $('tPerso'); pc.hidden = !P; if (P) pc.innerHTML = persoCard(P, true);
   const kidEl = $('tKid'), k = o.e >= 0 ? ENF.enfants[o.e] : null; kidEl.hidden = !k;
-  if (k) { kidEl.innerHTML = `<small>${P ? 'Ce don soutient' : 'Votre don participe à sauver'}</small>` + kidCard(k, true) + `<button class="btn small" type="button" id="kidMore">Voir sa fiche et son parcours</button>`; $('kidMore').onclick = () => openKid(k); }
+  if (k) { kidEl.innerHTML = `<small>${P ? 'Ce don soutient' : 'Ton don participe à sauver'}</small>` + kidCard(k, true) + `<button class="btn small" type="button" id="kidMore">Voir sa fiche et son parcours</button>`; $('kidMore').onclick = () => openKid(k); }
   const horizon = 3.57 * Math.sqrt(Math.max(h, .5)), floors = Math.max(1, Math.round(h / 3));
-  $('tFacts').innerHTML = [['Hauteur', fmt1(h), 'm', 'au-dessus du pont'], ['Horizon', '≈ ' + Math.round(horizon), 'km', 'de mer visible depuis votre nom, par temps clair'],
-    ['Comme un immeuble', floors, floors > 1 ? 'étages' : 'étage', 'environ 3 m par étage'], ['Votre rangée', row, '', `sur ${NR} de chaque côté du mât`]]
+  $('tFacts').innerHTML = [['Hauteur', fmt1(h), 'm', 'au-dessus du pont'], ['Horizon', '≈ ' + Math.round(horizon), 'km', 'de mer visible depuis ton nom, par temps clair'],
+    ['Comme un immeuble', floors, floors > 1 ? 'étages' : 'étage', 'environ 3 m par étage'], ['Ta rangée', row, '', `sur ${NR} de chaque côté du mât`]]
     .map(([l, v, u, sub]) => `<div class="fact"><small>${l}</small><b>${v}<u>${u}</u></b><span>${sub}</span></div>`).join('');
   // voisins de mât
   const nb = [], nm = i => i >= 0 ? `<strong>${donLink(D[i], D[i].p + ' ' + D[i].n)}</strong>` : null;
-  if (!P) for (let c = 0; c < NC; c++) if (c !== col) { const w = owner[enc(f, row, c)]; if (w >= 0 && D[w].perso < 0) nb.push(nm(w) + (c < col ? ' juste avant vous' : ' juste après vous')); }
+  if (!P) for (let c = 0; c < NC; c++) if (c !== col) { const w = owner[enc(f, row, c)]; if (w >= 0 && D[w].perso < 0) nb.push(nm(w) + (c < col ? ' juste avant toi' : ' juste après toi')); }
   const up = row < NR ? owner[enc(f, row + 1, P ? 1 : col)] : -1, dn = row > 1 ? owner[enc(f, row - 1, P ? 1 : col)] : -1;
   if (up >= 0) nb.push(nm(up) + ' juste au-dessus'); if (dn >= 0) nb.push(nm(dn) + ' juste en dessous');
-  $('tNeigh').innerHTML = nb.length ? (P ? 'Ses voisins de mât : ' : 'Vos voisins de mât : ') + nb.join(', ') + '.' : '';
-  // près de chez vous (prénoms seulement)
+  $('tNeigh').innerHTML = nb.length ? (P ? 'Ses voisins de mât : ' : 'Tes voisins de mât : ') + nb.join(', ') + '.' : '';
+  // près de chez soi (prénoms seulement)
   const near = $('tNear'); near.innerHTML = '';
   if (o.v >= 0) {
     const ville = VILLES[o.v], dep = DEPS[o.v], sameV = D.filter(x => x.v === o.v && x !== o), sameD = D.filter(x => x.v >= 0 && DEPS[x.v][0] === dep[0] && x !== o);
@@ -993,13 +1130,13 @@ function renderDoneCk(o) {
   const q = $('tQuote'); q.hidden = !o.m; q.innerHTML = o.m ? `« ${esc(o.m)} »<small>${o.local ? 'En attente de validation avant affichage public' : 'Message laissé lors du don'}${o.d ? ' · ' + fdate(o.d) : ''}</small>` : '';
   $('tPerso').hidden = true;
   const kidEl = $('tKid'), k = o.e >= 0 ? ENF.enfants[o.e] : null; kidEl.hidden = !k;
-  if (k) { kidEl.innerHTML = `<small>Votre don participe à sauver</small>` + kidCard(k, true) + `<button class="btn small" type="button" id="kidMore">Voir sa fiche et son parcours</button>`; $('kidMore').onclick = () => openKid(k); }
+  if (k) { kidEl.innerHTML = `<small>Ton don participe à sauver</small>` + kidCard(k, true) + `<button class="btn small" type="button" id="kidMore">Voir sa fiche et son parcours</button>`; $('kidMore').onclick = () => openKid(k); }
   $('tFacts').innerHTML = [['Sous ses yeux', '≈ 1', 'm', 'de Violette quand elle barre ou règle ses voiles'], ['Autour du monde', '≈ 45 000', 'km', 'au Vendée Globe, dans le cockpit'],
-    ['Votre place', `${row}·${col}`, '', `rang · colonne, sur ${CK.n} places`], ['Le cockpit', nf(ckOwner.filter(i => i >= 0).length), 'noms', 'déjà à bord']]
+    ['Ta place', `${row}·${col}`, '', `rang · colonne, sur ${CK.n} places`], ['Le cockpit', nf(ckOwner.filter(i => i >= 0).length), 'noms', 'déjà à bord']]
     .map(([l, v, u, sub]) => `<div class="fact"><small>${l}</small><b>${v}<u>${u}</u></b><span>${sub}</span></div>`).join('');
   const nb = [], at = (r, c) => r >= 0 && r < CK.rows && c >= 0 && c < CK.cols ? ckOwner[r * CK.cols + c] : -1, r0 = row - 1, c0 = col - 1;
   [[r0, c0 - 1, 'à gauche'], [r0, c0 + 1, 'à droite'], [r0 - 1, c0, 'au-dessus'], [r0 + 1, c0, 'en dessous']].forEach(([r, c, w]) => { const i = at(r, c); if (i >= 0) nb.push(`<strong>${donLink(D[i], D[i].p + ' ' + D[i].n)}</strong> ${w}`); });
-  $('tNeigh').innerHTML = nb.length ? 'Vos voisins dans le cockpit : ' + nb.join(', ') + '.' : '';
+  $('tNeigh').innerHTML = nb.length ? 'Tes voisins dans le cockpit : ' + nb.join(', ') + '.' : '';
   const near = $('tNear'); near.innerHTML = '';
   if (o.v >= 0) { const sameV = D.filter(x => x.v === o.v && x !== o); near.innerHTML = `<div><strong>${plural(sameV.length, 'autre donateur', 'autres donateurs')} ${esc(deVille(VILLES[o.v]))}</strong>${sameV.length ? ' : ' + sameV.slice(0, 14).map(x => donLink(x)).join(', ') + (sameV.length > 14 ? '…' : '') : ''}</div>`; }
   renderExtras(o); renderMyMap(o); $('tDyk').textContent = DYK[o.i % DYK.length];
@@ -1047,8 +1184,8 @@ $('tMap').addEventListener('click', () => openMap(current));
 function renderMyMap(o) {
   renderMap($('tMapSvg'), o.v, $('tMapCap'));
   if (o.v >= 0) { const n = CNT[o.v], v = VILLES[o.v];
-    $('tMapCap').innerHTML = n > 1 ? `Vous êtes l'un des <strong>${n} donateurs ${esc(deVille(v))}</strong>, parmi ${plural(NDON, 'donateur', 'donateurs')} dans ${plural(NVILLES, 'ville', 'villes')}.`
-      : `Vous êtes le premier donateur <strong>${esc(deVille(v))}</strong>, parmi ${plural(NDON, 'donateur', 'donateurs')}.`; }
+    $('tMapCap').innerHTML = n > 1 ? `Tu es l'un des <strong>${n} donateurs ${esc(deVille(v))}</strong>, parmi ${plural(NDON, 'donateur', 'donateurs')} dans ${plural(NVILLES, 'ville', 'villes')}.`
+      : `Tu es le premier donateur <strong>${esc(deVille(v))}</strong>, parmi ${plural(NDON, 'donateur', 'donateurs')}.`; }
   else $('tMapCap').innerHTML = `Les donateurs viennent de <strong>${plural(NVILLES, 'ville', 'villes')}</strong> de France.`;
 }
 function worldMap(sel) {
@@ -1161,7 +1298,7 @@ function markerBody(g, k, R, focus) {
   sv('circle', { r: R - 3, fill: '#b8323a' }, g);
   if (k.photo) { const im = sv('image', { href: k.photo, x: -(R - 3), y: -(R - 3), width: 2 * (R - 3), height: 2 * (R - 3), preserveAspectRatio: 'xMidYMid slice', 'clip-path': `url(#${id})` }, g); im.addEventListener('error', () => im.remove()); }
   const t = sv('text', { y: R + 15, class: 'nm' }, g); t.textContent = k.prenom;
-  sv('title', {}, g).textContent = `${k.prenom}, ${k.age} ans — ${k.ville} (${k.pays}) · ${kidStage(k)}`;
+  sv('title', {}, g).textContent = `${k.prenom}, ${ageTxt(k)} — ${k.ville} (${k.pays}) · ${kidStage(k)}`;
 }
 // grande carte : zoom, déplacement, photos de tous les enfants, clic → fiche
 function openKidsMap(focus) {
@@ -1203,7 +1340,7 @@ function openKidsMap(focus) {
   wrap.appendChild(ctr);
   const done = KIDS.filter(k => k.finance >= 1).length;
   const sub = document.createElement('p'); sub.className = 'sub';
-  sub.textContent = `${nf(ENF.anterieurs + done)} enfants opérés grâce à Initiatives-Cœur et Mécénat Chirurgie Cardiaque. Touchez une photo pour ouvrir la fiche de l'enfant ; pincez ou utilisez la molette pour zoomer.`;
+  sub.textContent = `${nf(ENF.anterieurs + done)} enfants opérés grâce à Initiatives-Cœur et Mécénat Chirurgie Cardiaque. Touche une photo pour ouvrir la fiche de l'enfant ; pince ou utilise la molette pour zoomer.`;
   const leg = document.createElement('div'); leg.className = 'klegend';
   leg.innerHTML = `<span><i class="lg-photo"></i>Enfants du mât (à leur ville)</span><span><i class="lg-histo"></i>Enfants opérés avant la campagne, par pays</span><span><i class="lg-arc"></i>Trajet vers l'hôpital en France</span>
     <span><i class="lg-dot" style="background:var(--vert)"></i>Opéré</span><span><i class="lg-dot" style="background:var(--ciel)"></i>Financé, voyage à venir</span><span><i class="lg-dot" style="background:#f2a516"></i>En cours de financement</span>`;
@@ -1220,20 +1357,20 @@ function shareTexts(kind, x) {
   const site = siteURL();
   if (kind === 'mine') { const o = x, k = o.e >= 0 ? ENF.enfants[o.e] : null, amt = o.amt ? ` de ${o.amt} €` : '';
     return { subject: 'Mon nom va faire le tour du monde avec Violette Dorange', short: `Mon nom est sur le bateau de Violette Dorange et j'aide à sauver un enfant ❤️ Toi aussi, dès 10 € :`,
-      body: `Bonjour,\n\nJe viens d'aider à sauver un enfant ! J'ai fait un don${amt} à Initiatives-Cœur pour Mécénat Chirurgie Cardiaque, et mon nom embarque sur le bateau de Violette Dorange : il va faire le tour du monde avec elle, jusqu'au Vendée Globe 2028.\n\n${k ? `Mon don aide ${k.prenom}, ${k.age} ans, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.\n\n` : ''}Toi aussi, tu peux mettre ton nom sur le bateau, dès 10 €, et aider un enfant : ${refURL(o)}\n\nMon nom est ici : ${ficheURL(o)}\n\nÀ bientôt,\n${o.p}`, url: ficheURL(o) }; }
+      body: `Bonjour,\n\nJe viens d'aider à sauver un enfant ! J'ai fait un don${amt} à Initiatives-Cœur pour Mécénat Chirurgie Cardiaque, et mon nom embarque sur le bateau de Violette Dorange : il va faire le tour du monde avec elle, jusqu'au Vendée Globe 2028.\n\n${k ? `Mon don aide ${k.prenom}, ${ageTxt(k)}, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.\n\n` : ''}Toi aussi, tu peux mettre ton nom sur le bateau, dès 10 €, et aider un enfant : ${refURL(o)}\n\nMon nom est ici : ${ficheURL(o)}\n\nÀ bientôt,\n${o.p}`, url: ficheURL(o) }; }
   if (kind === 'donor') { const o = x;
     return { subject: `${o.p} ${o.n} a son nom sur le bateau de Violette Dorange`, short: `${o.p} ${o.n} a son nom sur le bateau de Violette Dorange et aide à sauver un enfant ❤️`,
       body: `Bonjour,\n\nRegarde : ${o.p} ${o.n} a mis son nom sur le bateau de Violette Dorange pour aider Mécénat Chirurgie Cardiaque à faire opérer du cœur des enfants venus de loin.\n\nSa fiche : ${ficheURL(o)}\n\nToi aussi, dès 10 €, ton nom peut faire le tour du monde avec Violette : ${site}`, url: ficheURL(o) }; }
   if (kind === 'kid') { const k = x;
-    return { subject: `L'histoire de ${k.prenom}, ${k.age} ans`, short: `${k.prenom}, ${k.age} ans, est soigné${acc(k, '', 'e')} grâce aux donateurs du bateau de Violette Dorange ❤️`,
-      body: `Bonjour,\n\nJe te partage l'histoire de ${k.prenom}, ${k.age} ans, venu${acc(k, '', 'e')} de ${k.ville} (${k.pays}) pour être opéré${acc(k, '', 'e')} du cœur en France grâce à Mécénat Chirurgie Cardiaque et aux donateurs d'Initiatives-Cœur.\n\nEn mettant ton nom sur le bateau de Violette Dorange (dès 10 €), tu peux aider d'autres enfants comme ${acc(k, 'lui', 'elle')} : ${site}`, url: site }; }
+    return { subject: `L'histoire de ${k.prenom}, ${ageTxt(k)}`, short: `${k.prenom}, ${ageTxt(k)}, est soigné${acc(k, '', 'e')} grâce aux donateurs du bateau de Violette Dorange ❤️`,
+      body: `Bonjour,\n\nJe te partage l'histoire de ${k.prenom}, ${ageTxt(k)}, venu${acc(k, '', 'e')} de ${k.ville} (${k.pays}) pour être opéré${acc(k, '', 'e')} du cœur en France grâce à Mécénat Chirurgie Cardiaque et aux donateurs d'Initiatives-Cœur.\n\nEn mettant ton nom sur le bateau de Violette Dorange (dès 10 €), tu peux aider d'autres enfants comme ${acc(k, 'lui', 'elle')} : ${site}`, url: site }; }
   return { subject: 'Ton nom autour du monde sur le bateau de Violette Dorange', short: 'Dès 10 €, ton nom embarque sur le bateau de Violette Dorange et tu aides à sauver un enfant ❤️',
     body: `Bonjour,\n\nTu connais Violette Dorange ? Dès 10 €, ton prénom et ton nom peuvent embarquer sur son bateau, Initiatives-Cœur, et faire le tour du monde avec elle jusqu'au Vendée Globe 2028.\n\nChaque don aide Mécénat Chirurgie Cardiaque à faire opérer du cœur des enfants venus de loin. Et 5 donateurs tirés au sort navigueront avec Violette !\n\nC'est par ici : ${site}`, url: site };
 }
 function openShare(kind, x) {
   const T = shareTexts(kind, x), enc2 = encodeURIComponent;
   const html = `<div class="share">
-    ${kind === 'mine' || kind === 'donor' ? `<div class="shsoc"><span><b>Instagram, Facebook :</b> une image ou une vidéo de ${kind === 'mine' || x === current ? 'votre' : 'ce'} nom sur le bateau, prête à publier.</span><button class="btn red small" type="button" id="shSoc">Créer les visuels</button></div>` : ''}
+    ${kind === 'mine' || kind === 'donor' ? `<div class="shsoc"><span><b>Instagram, Facebook :</b> une image ou une vidéo de ${kind === 'mine' || x === current ? 'ton' : 'ce'} nom sur le bateau, prête à publier.</span><button class="btn red small" type="button" id="shSoc">Créer les visuels</button></div>` : ''}
     <p class="sub">Le texte est modifiable avant l'envoi.</p>
     <label>Destinataires <small>(une ou plusieurs adresses e-mail, séparées par des virgules — facultatif)</small><input id="shTo" type="email" multiple placeholder="claire@exemple.fr, marc@exemple.fr" autocomplete="off"></label>
     <label>Objet<input id="shSub" value="${esc(T.subject)}"></label>
@@ -1247,7 +1384,7 @@ function openShare(kind, x) {
       <button class="btn" id="shCopy" type="button">Copier le texte</button>
       ${navigator.share ? '<button class="btn" id="shNative" type="button">Autres applis…</button>' : ''}
     </div>
-    <p class="fine">L'e-mail part de votre propre messagerie : aucune adresse n'est enregistrée par le site.</p></div>`;
+    <p class="fine">L'e-mail part de ta propre messagerie : aucune adresse n'est enregistrée par le site.</p></div>`;
   openDlg(kind === 'mine' ? 'Partager mon don' : kind === 'kid' ? `Partager l'histoire de ${x.prenom}` : kind === 'donor' ? `Partager la fiche de ${x.p}` : 'Partager la campagne', html, b => {
     const to = b.querySelector('#shTo'), sub = b.querySelector('#shSub'), body = b.querySelector('#shBody');
     const upd = () => { const dest = to.value.split(/[,;\s]+/).filter(Boolean).join(',');
@@ -1350,7 +1487,7 @@ function socInfo(o, me) {
   const h = inCk ? 0 : hOf(rowS(dec(o.slot).row));
   const lieu = inCk ? 'dans le cockpit, sous les yeux de Violette' : `sur le mât, à ${fmtM(h)} au-dessus du pont`;
   const tag = inCk ? 'COCKPIT' : fmtM(h).toUpperCase();
-  const kidLine = k ? `${me ? "Et j'aide à sauver" : 'Son don aide à sauver'} ${k.prenom}, ${k.age} ans, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.`
+  const kidLine = k ? `${me ? "Et j'aide à sauver" : 'Son don aide à sauver'} ${k.prenom}, ${ageTxt(k)}, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.`
     : P ? `${o.p} soutient Mécénat Chirurgie Cardiaque, qui fait opérer du cœur des enfants venus de loin.` : 'Chaque don aide Mécénat Chirurgie Cardiaque à faire opérer du cœur des enfants venus de loin.';
   const head = me ? ['MON NOM FAIT', 'LE TOUR DU MONDE', 'AVEC VIOLETTE DORANGE'] : [full.toUpperCase(), P ? 'EST À BORD' : 'FAIT LE TOUR DU MONDE', 'AVEC VIOLETTE DORANGE'];
   const url = me && !P ? refURL(o) : PUB();
@@ -1524,16 +1661,16 @@ function openSocial(o, me) {
   const tabs = Object.entries(SOC_FMT).map(([id, f]) => `<button type="button" class="stab" data-f="${id}"><b>${f.nom}</b><small>${f.sub}</small></button>`).join('')
     + `<button type="button" class="stab" data-f="video"><b>Vidéo</b><small>Story · Reel · 15 s</small></button>`;
   const html = `<div class="soc">
-    <p class="sub">${me ? 'Vos visuels sont prêts : publiez-les sur Instagram ou Facebook pour embarquer vos proches.' : `Des visuels prêts à publier pour faire connaître la campagne.`}</p>
+    <p class="sub">${me ? 'Tes visuels sont prêts : publie-les sur Instagram ou Facebook pour embarquer tes proches.' : `Des visuels prêts à publier pour faire connaître la campagne.`}</p>
     <div class="stabs">${tabs}</div>
     <div class="sgrid"><div class="sprev" id="sPrev"></div>
     <div class="sside">
-    ${IN_FRAME ? `<p class="sframe">Vous êtes dans un aperçu intégré : le téléchargement et le partage y sont bloqués. <a href="${esc(PUB() + '#' + o.slug)}" target="_blank" rel="noopener">Ouvrez la page publique</a> pour enregistrer les images et la vidéo.</p>` : ''}
+    ${IN_FRAME ? `<p class="sframe">Tu es dans un aperçu intégré : le téléchargement et le partage y sont bloqués. <a href="${esc(PUB() + '#' + o.slug)}" target="_blank" rel="noopener">Ouvre la page publique</a> pour enregistrer les images et la vidéo.</p>` : ''}
     <div class="sbtns"><button class="btn red" type="button" id="sShare">Partager…</button><button class="btn" type="button" id="sDl">Télécharger</button><button class="btn" type="button" id="sMake" hidden>Refaire la vidéo</button></div>
     <p class="fine" id="sNote"></p>
     <label class="slab">Texte à coller en légende <small>(modifiable)</small><textarea id="sTxt" rows="7">${esc(info.caption)}</textarea></label>
     <div class="sbtns"><button class="btn" type="button" id="sCopy">Copier le texte</button></div>
-    <p class="fine">Sur téléphone, « Partager » ouvre le menu de votre téléphone : choisissez Instagram ou Facebook. Instagram ne reprend pas le texte : copiez-le d'abord, puis collez-le en légende. Sur ordinateur, le fichier est téléchargé et le texte copié.</p>
+    <p class="fine">Sur téléphone, « Partager » ouvre le menu de ton téléphone : choisis Instagram ou Facebook. Instagram ne reprend pas le texte : copie-le d'abord, puis colle-le en légende. Sur ordinateur, le fichier est téléchargé et le texte copié.</p>
     </div></div>
   </div>`;
   openDlg(me ? 'Partager sur les réseaux' : `Partager : ${o.p} ${o.n}`, html, b => {
@@ -1546,8 +1683,8 @@ function openSocial(o, me) {
       if (fk === 'video') {
         if (cache.video) { prev.innerHTML = ''; const v = document.createElement('video'); v.src = cache.video.url; v.controls = true; v.playsInline = true; v.loop = true; prev.append(v); bMake.hidden = false;
           note.textContent = cache.video.ext === 'mp4' ? 'Vidéo MP4 verticale, prête pour une story ou un reel.' : "Ce navigateur produit une vidéo WebM, qu'Instagram n'accepte pas toujours. Sur iPhone (Safari) ou avec un Chrome à jour, elle sort en MP4."; return; }
-        if (!canFilm()) { prev.innerHTML = '<p class="sload">Ce navigateur ne sait pas enregistrer de vidéo. Essayez avec Safari, Chrome ou Edge à jour.</p>'; return; }
-        prev.innerHTML = `<div class="sintro"><b>Votre film de 15 secondes</b><span>Survol du bateau, montée jusqu'à ${me ? 'votre' : 'ce'} nom, l'enfant aidé, puis l'adresse de la campagne. La vidéo se fabrique en direct : gardez cette fenêtre ouverte.</span><button class="btn red" type="button" id="sGo">Créer la vidéo</button></div>`;
+        if (!canFilm()) { prev.innerHTML = '<p class="sload">Ce navigateur ne sait pas enregistrer de vidéo. Essaie avec Safari, Chrome ou Edge à jour.</p>'; return; }
+        prev.innerHTML = `<div class="sintro"><b>Ton film de 15 secondes</b><span>Survol du bateau, montée jusqu'à ${me ? 'ton' : 'ce'} nom, l'enfant aidé, puis l'adresse de la campagne. La vidéo se fabrique en direct : garde cette fenêtre ouverte.</span><button class="btn red" type="button" id="sGo">Créer la vidéo</button></div>`;
         prev.querySelector('#sGo').onclick = () => film(); return;
       }
       if (!cache[fk]) { prev.innerHTML = '<p class="sload">Préparation de l\'image…</p>'; setBusy(true);
@@ -1562,15 +1699,15 @@ function openSocial(o, me) {
       try { res = await makeFilm(o, me, (cv, t) => { lg.drawImage(cv, 0, 0, lc.width, lc.height); bar.style.width = Math.min(100, t / 15 * 100) + '%'; }); }
       catch (e) { res = null; }
       setBusy(false);
-      if (!res) { prev.innerHTML = '<p class="sload">La vidéo a été interrompue. Réessayez en gardant cette fenêtre ouverte.</p>'; return; }
+      if (!res) { prev.innerHTML = '<p class="sload">La vidéo a été interrompue. Réessaie en gardant cette fenêtre ouverte.</p>'; return; }
       if (cache.video) URL.revokeObjectURL(cache.video.url); cache.video = { blob: res.blob, url: URL.createObjectURL(res.blob), ext: res.ext }; if (cur === 'video') show('video');
     };
     b.querySelectorAll('.stab').forEach(x => x.onclick = () => { if (!busy) show(x.dataset.f); });
     bMake.onclick = () => { if (!busy) film(); };
-    const act = async dl => { const c = cache[cur]; if (!c) { if (cur === 'video') { note.textContent = "Créez d'abord la vidéo."; } return; }
+    const act = async dl => { const c = cache[cur]; if (!c) { if (cur === 'video') { note.textContent = "Crée d'abord la vidéo."; } return; }
       const name = fname(cur, c.ext);
-      if (dl) { const a = document.createElement('a'); a.href = c.url; a.download = name; document.body.append(a); a.click(); a.remove(); note.textContent = 'Fichier téléchargé : publiez-le depuis Instagram ou Facebook.'; return; }
-      const r = await shareFile(c.blob, name, txt.value); if (r === 'downloaded') note.textContent = 'Fichier téléchargé et texte copié : publiez-le depuis Instagram ou Facebook, puis collez le texte en légende.'; };
+      if (dl) { const a = document.createElement('a'); a.href = c.url; a.download = name; document.body.append(a); a.click(); a.remove(); note.textContent = 'Fichier téléchargé : publie-le depuis Instagram ou Facebook.'; return; }
+      const r = await shareFile(c.blob, name, txt.value); if (r === 'downloaded') note.textContent = 'Fichier téléchargé et texte copié : publie-le depuis Instagram ou Facebook, puis colle le texte en légende.'; };
     bShare.onclick = () => act(false); bDl.onclick = () => act(true);
     const cp = b.querySelector('#sCopy'); cp.onclick = async () => { try { await navigator.clipboard.writeText(txt.value); cp.textContent = 'Texte copié'; } catch (e) { txt.select(); cp.textContent = 'Sélectionné : Ctrl/Cmd + C'; } };
     show('post');
@@ -1581,8 +1718,8 @@ function openSocial(o, me) {
 const filleuls = o => D.filter(x => x.r === o.i && x !== o);
 function refBlock(o) {
   const fl = filleuls(o), names = fl.slice(0, 8).map(x => donLink(x, x.p + ' ' + x.n)).join(', ') + (fl.length > 8 ? ` et ${plural(fl.length - 8, 'autre', 'autres')}` : '');
-  return `<small>Embarquez vos proches</small>
-    <p>${fl.length ? `Grâce à vous, <strong>${plural(fl.length, 'nom a', 'noms ont')}</strong> déjà embarqué : ${names}.` : 'Partagez votre lien : chaque proche qui met son nom sur le bateau apparaîtra ici, et sur votre fiche.'}</p>
+  return `<small>Embarque tes proches</small>
+    <p>${fl.length ? `Grâce à toi, <strong>${plural(fl.length, 'nom a', 'noms ont')}</strong> déjà embarqué : ${names}.` : 'Partage ton lien : chaque proche qui met son nom sur le bateau apparaîtra ici, et sur ta fiche.'}</p>
     <div class="reflink"><code>${esc(refURL(o))}</code><button class="btn small" type="button" data-a="refcopy">Copier mon lien</button></div>`;
 }
 function bindRef(box, o) { const b = box.querySelector('[data-a=refcopy]'); if (b) b.onclick = async () => { try { await navigator.clipboard.writeText(refURL(o)); b.textContent = 'Lien copié'; } catch (e) { b.textContent = refURL(o); } }; }
@@ -1591,11 +1728,11 @@ function bindRef(box, o) { const b = box.querySelector('[data-a=refcopy]'); if (
 function chainText(o) {
   if (o.perso >= 0) return '';
   const k = o.e >= 0 ? ENF.enfants[o.e] : null; let a;
-  if (isCk(o)) { const n = ckOwner.filter(i => i >= 0 && i !== o.i).length; a = `Votre nom est dans le cockpit, avec ${plural(n, 'autre nom', 'autres noms')} sous les yeux de Violette.`; }
+  if (isCk(o)) { const n = ckOwner.filter(i => i >= 0 && i !== o.i).length; a = `Ton nom est dans le cockpit, avec ${plural(n, 'autre nom', 'autres noms')} sous les yeux de Violette.`; }
   else { const { row } = dec(o.slot); let n = 0; for (const ff of [0, 1]) for (let c = 0; c < NC; c++) { const w = owner[enc(ff, row, c)]; if (w >= 0 && w !== o.i) n++; }
-    a = `Votre nom est au rang ${row} du mât, ${n ? `avec ${plural(n, 'autre nom', 'autres noms')} à la même hauteur` : 'seul à cette hauteur pour l\'instant'}.`; }
+    a = `Ton nom est au rang ${row} du mât, ${n ? `avec ${plural(n, 'autre nom', 'autres noms')} à la même hauteur` : 'seul à cette hauteur pour l\'instant'}.`; }
   const de = k ? (VOY.test(k.prenom) ? "d'" : 'de ') : '';
-  const b = k ? ` Votre don rejoint ${k.donateurs > 1 ? `ceux de ${plural(k.donateurs - 1, 'autre donateur', 'autres donateurs')}` : 'les premiers dons'} pour l'opération ${de}<strong>${esc(k.prenom)}, ${k.age} ans</strong>.` : '';
+  const b = k ? ` Ton don rejoint ${k.donateurs > 1 ? `ceux de ${plural(k.donateurs - 1, 'autre donateur', 'autres donateurs')}` : 'les premiers dons'} pour l'opération ${de}<strong>${esc(k.prenom)}, ${ageTxt(k)}</strong>.` : '';
   const c = NKIDS_DONE ? ` Ensemble, les noms du bateau ont déjà financé <strong>${plural(NKIDS_DONE, 'enfant', 'enfants')}</strong>.` : '';
   return a + b + c;
 }
@@ -1701,7 +1838,7 @@ function openMap(arg) {
         if (inV && !t) { t = sv('text', { 'data-i': d.o.i, class: d.o === meO ? 'me' : '' }, gLab); t.textContent = d.o.p; labels.set(d.o.i, t); }
         if (t) { t.style.display = inV ? '' : 'none'; if (inV) { t.setAttribute('x', d.x); t.setAttribute('y', d.y + clamp(px * 0.36, 1.1, 7) * u + 11 * u); t.setAttribute('font-size', 11 * u); t.setAttribute('stroke-width', 3 * u); } } }); }
     else labels.forEach(t => t.style.display = 'none');
-    hint.textContent = indiv ? (px >= 30 ? 'Touchez un prénom pour ouvrir la fiche du donateur.' : 'Zoomez encore pour lire les prénoms, ou touchez un point.') : 'Touchez une ville pour zoomer sur ses donateurs.';
+    hint.textContent = indiv ? (px >= 30 ? 'Touche un prénom pour ouvrir la fiche du donateur.' : 'Zoome encore pour lire les prénoms, ou touche un point.') : 'Touche une ville pour zoomer sur ses donateurs.';
   }, el => {
     const i = el.closest('[data-i]')?.dataset.i; if (i != null) return openDonor(D[+i]);
     const v = el.closest('[data-v]')?.dataset.v; if (v != null) { const c = cities.find(x => x.i === +v); Z.flyTo(c.x, c.y, Math.max(c.rad * 5, 6)); }
@@ -1737,14 +1874,14 @@ function openMessages() {
 function openTiers() {
   const T = CTP.paliers.map(p => `<div class="tier"><span class="amt">${p.min} €</span><b>${esc(p.nom)}</b><em>${esc(p.accroche)}</em><ul>${p.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('');
   const L = CTP.tirage;
-  openDlg('Contreparties', `<p class="sub">Choisissez votre place sur le mât à partir de ${CFG.prix_choix} €. Les contreparties s'additionnent d'un palier à l'autre.</p>
+  openDlg('Contreparties', `<p class="sub">Choisis ta place sur le mât à partir de ${CFG.prix_choix} €. Les contreparties s'additionnent d'un palier à l'autre.</p>
     <div class="tiers">${T}</div>
     <h2>${esc(L.titre)}</h2><p class="sub">${esc(L.regle)} Tirage ${esc(L.date)}.</p><ul class="lots">${L.lots.map(l => `<li><b>${l.nb} ×</b> ${esc(l.nom)}</li>`).join('')}</ul>
     <p class="fine">${esc(L.mentions)} Si le don ouvre droit à une réduction d'impôt, la valeur des contreparties doit rester faible (25 % du don au plus, dans la limite d'un plafond annuel) : à valider avec l'expert-comptable.</p>
     <button class="go" type="button" id="tiersGo">Faire un don</button>`, b => b.querySelector('#tiersGo').onclick = () => { closeDlg(); startDon(); });
 }
 function persoCard(P, compact) {
-  const photos = P.photos && P.photos.length ? P.photos : [];
+  const photos = (P.photos || []).filter(p => !(p && p.generique));   // un visuel générique ne remplace pas les initiales
   const img = photos[0] ? `<img src="${esc(typeof photos[0] === 'string' ? photos[0] : photos[0].src)}" alt="">` : esc((P.prenom[0] || '') + (P.nom[0] || ''));
   const lien = P.lien ? `<p><b>Son lien avec Initiatives-Cœur :</b> ${esc(P.lien)}</p>` : `<p><span class="draft">À compléter</span> Son lien avec Initiatives-Cœur.</p>`;
   return `<div class="top"><div class="avatar" style="background:#ce111e">${img}</div><div><small>${P.categorie ? esc(P.categorie) + ' du projet' : 'Personnalité du projet'}</small><h3>${esc(P.prenom)} ${esc(P.nom)}</h3><p>${esc(P.titre)}</p></div></div>
@@ -1753,7 +1890,7 @@ function persoCard(P, compact) {
 function photoStrip(P) {
   const ph = (P.photos || []).map(p => typeof p === 'string' ? { src: p } : p);
   if (!ph.length) return `<div class="photos"><figure><div class="ph"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-8 8"/></svg>Photos à ajouter<br><small>dossier personnalites/ + data/personnalites.json</small></div></figure></div>`;
-  return `<div class="photos">${ph.map(p => `<figure><img src="${esc(p.src)}" alt="${esc(P.prenom + ' ' + P.nom)}" loading="lazy">${p.credit ? `<figcaption>© ${esc(p.credit)}</figcaption>` : ''}</figure>`).join('')}</div>`;
+  return `<div class="photos">${ph.map(p => `<figure><img src="${esc(p.src)}" alt="${esc(P.prenom + ' ' + P.nom)}" loading="lazy">${p.credit ? `<figcaption>${p.generique ? '' : '© '}${esc(p.credit)}</figcaption>` : ''}</figure>`).join('')}</div>`;
 }
 const PALCOL = ['#2b5a87', '#2f7d6d', '#b8323a', '#9a6a12', '#ce111e'];
 function openDonor(o) {
@@ -1820,7 +1957,7 @@ function openKid(k) {
   const map = kidsMiniMap(k);
   const card = document.createElement('div'); card.className = 'kid'; card.innerHTML = kidCard(k, false);
   const ph = document.createElement('div'); ph.className = 'photos';
-  ph.innerHTML = k.photo ? `<figure><img src="${esc(k.photo)}" alt="Portrait illustré de ${esc(k.prenom)}"><figcaption>${k.photo_illustration ? 'Illustration · enfant fictif (démo)' : 'Photo Mécénat Chirurgie Cardiaque, avec l\'accord de la famille'}</figcaption></figure>`
+  ph.innerHTML = k.photo ? `<figure><img src="${esc(k.photo)}" alt="Portrait de ${esc(k.prenom)}"><figcaption>${k.photo_illustration ? 'Illustration · enfant fictif (démo)' : k.photo_demo ? 'Photo d\'un enfant opéré grâce à Mécénat Chirurgie Cardiaque · prénom et histoire fictifs (démo)' : 'Photo Mécénat Chirurgie Cardiaque, avec l\'accord de la famille'}</figcaption></figure>`
     : `<figure><div class="ph"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-8 8"/></svg>Photo transmise par Mécénat Chirurgie Cardiaque<br>avec l'accord de la famille</div></figure>`;
   const info = document.createElement('div'); info.className = 'recap';
   const st = k.statut, inFr = ['en-france', 'convalescence', 'rentree'].includes(st), op = ['convalescence', 'rentree'].includes(st);
@@ -1833,7 +1970,7 @@ function openKid(k) {
   const who = document.createElement('div'); who.className = 'who'; const N0 = 48;
   const drawWho = all => who.innerHTML = `<h3>Ils ont permis de ${acc(k, 'le', 'la')} sauver</h3><p><strong>${plural(donors.length, 'donateur', 'donateurs')}</strong> ${donors.length > 1 ? 'ont' : 'a'} contribué : `
     + (all ? donors : donors.slice(0, N0)).map(o => donLink(o)).join(', ')
-    + (!all && donors.length > N0 ? ` … <button class="lk" type="button">voir les ${donors.length}</button>` : '') + `</p><p class="fine">Touchez un prénom pour ouvrir la fiche du donateur et retrouver sa place sur le bateau.</p>`;
+    + (!all && donors.length > N0 ? ` … <button class="lk" type="button">voir les ${donors.length}</button>` : '') + `</p><p class="fine">Touche un prénom pour ouvrir la fiche du donateur et retrouver sa place sur le bateau.</p>`;
   drawWho(false); who.addEventListener('click', e => { if (e.target.closest('.lk')) drawWho(true); });
   const team = teamBlock(k);
   const note = document.createElement('p'); note.className = 'fine'; note.textContent = 'Fiche fictive. Les vraies fiches seront publiées avec l\'accord des familles et de Mécénat Chirurgie Cardiaque, sans donnée médicale détaillée.';
@@ -1841,7 +1978,7 @@ function openKid(k) {
   L.style.display = R.style.display = 'grid'; L.style.gap = R.style.gap = '12px'; L.append(ph, map); R.append(card, info); two.append(L, R);
   const shr = document.createElement('div'); shr.className = 'actions'; shr.innerHTML = `<button class="btn primary" type="button">Partager l'histoire de ${esc(k.prenom)}</button><button class="btn" type="button">Mettre mon nom sur le bateau</button>`;
   shr.children[0].onclick = () => openShare('kid', k); shr.children[1].onclick = () => { closeDlg(); if (app.dataset.view === 'landing') leaveLanding(startDon); else startDon(); };
-  openDlg(`${k.prenom}, ${k.age} ans`, [two, team, who, shr, note].filter(Boolean));
+  openDlg(`${k.prenom}, ${ageTxt(k)}`, [two, team, who, shr, note].filter(Boolean));
 }
 
 openDonor = dlgNav(openDonor); openPerso = dlgNav(openPerso); openKid = dlgNav(openKid); openKids = dlgNav(openKids); openKidsMap = dlgNav(openKidsMap);
@@ -1864,7 +2001,7 @@ function gotoStep(n) {
   DS.step = n; document.querySelectorAll('.dstep').forEach(d => d.classList.toggle('on', +d.dataset.step === n));
   $('steps').innerHTML = [1, 2, 3, 4].map(i => `<span class="${i <= n ? 'on' : ''}"></span>`).join('');
   setPick(n === 2 && (DS.zone === 'ck' || DS.amt >= CFG.prix_choix));
-  if (n === 2) $('placeTitle').textContent = DS.zone === 'ck' ? 'Votre place dans le cockpit' : 'Votre place sur le mât';
+  if (n === 2) $('placeTitle').textContent = DS.zone === 'ck' ? 'Ta place dans le cockpit' : 'Ta place sur le mât';
   if (n === 1) renderAmounts();
   if (n === 2) renderPlace();
   if (n === 3) { if (!$('dPrenom').value && $('prenom').value) $('dPrenom').value = $('prenom').value; if (!$('dNom').value && $('nom').value) $('dNom').value = $('nom').value; drawSticker(); checkInfo(); }
@@ -1886,7 +2023,7 @@ function renderAmounts() {
   $('tier').innerHTML = `<b>Palier <em>${esc(P.nom)}</em></b><span>${esc(P.accroche)}</span><ul>${P.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul><button class="chip blue" type="button" id="seeTiers">Tous les paliers et le tirage au sort</button>`;
   $('seeTiers').onclick = openTiers;
   const k = ENF.enfants.find(e => e.finance < 1) || ENF.enfants[ENF.enfants.length - 1];
-  $('impact').innerHTML = `${nf(ENF.cout)} € permettent de sauver un enfant. Votre don de <strong>${DS.amt} €</strong> rejoint ceux qui financent l'opération de <strong>${esc(k.prenom)}, ${k.age} ans (${esc(k.pays)})</strong>, déjà financée à ${Math.round(k.finance * 100)} %.`;
+  $('impact').innerHTML = `${nf(ENF.cout)} € permettent de sauver un enfant. Ton don de <strong>${DS.amt} €</strong> rejoint ceux qui financent l'opération de <strong>${esc(k.prenom)}, ${ageTxt(k)} (${esc(k.pays)})</strong>, déjà financée à ${Math.round(k.finance * 100)} %.`;
 }
 $('amtOther').addEventListener('input', e => { const v = parseInt(e.target.value.replace(/\D/g, ''), 10); if (v >= (DS.zone === 'ck' ? PCK() : CFG.prix_auto)) { DS.amt = v; renderAmounts(); $('amtOther').value = v; } });
 function setPick(on) { if (pickMode === on) { drawCk(); return; } pickMode = on; stage.classList.toggle('picking', on); $('pickbar').hidden = !on; redrawAll(); drawCk(); }
@@ -1895,8 +2032,8 @@ function renderPlace() {
   if (DS.zone === 'ck') {
     if (DS.ck >= 0 && ckOwner[DS.ck] >= 0) DS.ck = -1;
     const nbN = DS.ck >= 0 ? (() => { const r = Math.floor(DS.ck / CK.cols), c = DS.ck % CK.cols; return [[r, c - 1], [r, c + 1]].filter(([a, b]) => b >= 0 && b < CK.cols).map(([a, b]) => ckOwner[a * CK.cols + b]).filter(i => i >= 0).map(i => D[i].p + ' ' + D[i].n); })() : [];
-    box.innerHTML = DS.ck >= 0 ? `<div class="place"><small>Votre place</small><b>${ckLabel(DS.ck)}</b><span>Sur la cloison du cockpit, sous les yeux de Violette${nbN.length ? ' · à côté de ' + esc(nbN.join(' et ')) : ''}</span></div>`
-      : `<div class="place"><small>Comme dans un avion</small><b>Touchez une place libre</b><span>Les cases vertes du cockpit sont libres. Faites glisser pour parcourir la plaque, zoomez pour lire les noms.</span></div>`;
+    box.innerHTML = DS.ck >= 0 ? `<div class="place"><small>Ta place</small><b>${ckLabel(DS.ck)}</b><span>Sur la cloison du cockpit, sous les yeux de Violette${nbN.length ? ' · à côté de ' + esc(nbN.join(' et ')) : ''}</span></div>`
+      : `<div class="place"><small>Comme dans un avion</small><b>Touche une place libre</b><span>Les cases vertes du cockpit sont libres. Fais glisser pour parcourir la plaque, zoome pour lire les noms.</span></div>`;
     q.innerHTML = ''; const frees = [...Array(CK.n).keys()].filter(c => ckOwner[c] < 0);
     q.append(chip('Au centre', 'blue', () => { const mid = frees.sort((a, b) => Math.hypot(Math.floor(a / CK.cols) - CK.rows / 2, a % CK.cols - (CK.cols - 1) / 2) - Math.hypot(Math.floor(b / CK.cols) - CK.rows / 2, b % CK.cols - (CK.cols - 1) / 2))[0]; selectCk(mid); }),
       chip('Tout en haut', 'blue', () => selectCk(frees.sort((a, b) => a - b)[0])), chip('Au hasard', 'blue', () => selectCk(frees[Math.floor(Math.random() * frees.length)])), chip('Plutôt le mât', 'perso', () => { DS.zone = 'mat'; DS.ck = -1; ckSel = -1; drawCk(); gotoStep(1); }));
@@ -1911,8 +2048,8 @@ function renderPlace() {
   }
   if (DS.slot >= 0 && owner[DS.slot] >= 0) DS.slot = -1;
   box.innerHTML = DS.slot >= 0 ? (() => { const { row } = dec(DS.slot); const nb = [0, 1, 2].filter(c => c !== dec(DS.slot).col).map(c => owner[enc(dec(DS.slot).f, row, c)]).filter(i => i >= 0).map(i => D[i].p + ' ' + D[i].n);
-      return `<div class="place"><small>Votre place</small><b>${slotLabel(DS.slot)}</b><span>${fmtM(hOf(rowS(row)))} au-dessus du pont${nb.length ? ' · à côté de ' + esc(nb.join(' et ')) : ''}</span></div>`; })()
-    : `<div class="place"><small>Comme dans un avion</small><b>Touchez une place libre</b><span>Les cases vertes sont libres. Faites glisser pour monter, tournez pour passer de l'autre côté.</span></div>`;
+      return `<div class="place"><small>Ta place</small><b>${slotLabel(DS.slot)}</b><span>${fmtM(hOf(rowS(row)))} au-dessus du pont${nb.length ? ' · à côté de ' + esc(nb.join(' et ')) : ''}</span></div>`; })()
+    : `<div class="place"><small>Comme dans un avion</small><b>Touche une place libre</b><span>Les cases vertes sont libres. Fais glisser pour monter, tourne pour passer de l'autre côté.</span></div>`;
   q.innerHTML = '';
   const freeNear = (s, f) => { let best = -1, bd = 1e9; for (let sl = 0; sl < NS; sl++) { if (owner[sl] >= 0) continue; const d = dec(sl); if (f != null && d.f !== f) continue; const dd = Math.abs(rowS(d.row) - s); if (dd < bd) { bd = dd; best = sl; } } return best; };
   q.append(chip('Tout en haut', 'blue', () => selectSlot(freeNear(30))), chip('À mi-hauteur', 'blue', () => selectSlot(freeNear(14.5 / MAT.A[1]))),
@@ -1921,7 +2058,7 @@ function renderPlace() {
   $('placeNext').disabled = DS.slot < 0;
 }
 function showSlot(sl, pick) { if (ck.on) { spotCk = -1; leaveCockpit().then(ok => { if (ok) showSlot(sl, pick); }); return; } const { f, row } = dec(sl); spotSlot = sl; spotWhole = false; $('spot').classList.add('show'); $('spot').classList.toggle('pick', !!pick);
-  $('spotTxt').textContent = 'Votre place · ' + fmtM(hOf(rowS(row))); const my = ++token; glideTo(rowS(row), f === 0 ? 0 : Math.PI, closeD(), my); }
+  $('spotTxt').textContent = 'Ta place · ' + fmtM(hOf(rowS(row))); const my = ++token; glideTo(rowS(row), f === 0 ? 0 : Math.PI, closeD(), my); }
 function selectSlot(sl) { if (sl < 0 || owner[sl] >= 0) return; DS.slot = sl; showSlot(sl, true); renderPlace(); }
 function drawSticker() {
   const cv = $('sticker'), ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
@@ -1955,7 +2092,7 @@ function renderRecap() {
   $('recap').innerHTML = [['Don', `${DS.amt} € · palier ${P.nom}`], [inCk ? 'Dans le cockpit' : 'Sur le mât', `${DS.p} ${DS.n}`], ['Place', inCk ? ckLabel(DS.ck) : `${slotLabel(sl)} · ${fmtM(hOf(rowS(dec(sl).row)))}`],
     ['Ville', DS.ville || '—'], ['Message', DS.msg || '—']].map(([a, b]) => `<div><span>${a}</span><span>${esc(b)}</span></div>`).join('');
   $('pay').textContent = `Payer ${DS.amt} € en toute sécurité`;
-  $('payNote').textContent = CFG.don_url ? 'Vous allez être redirigé vers la page de dons sécurisée d\'Initiatives-Cœur. Votre place est réservée pendant ' + CFG.reservation_minutes + ' minutes.'
+  $('payNote').textContent = CFG.don_url ? 'Tu vas être redirigé vers la page de dons sécurisée d\'Initiatives-Cœur. Ta place est réservée pendant ' + CFG.reservation_minutes + ' minutes.'
     : 'Prototype : le paiement n\'est pas encore branché au système de dons d\'Initiatives-Cœur. Le bouton simule un don accepté (enregistré seulement dans ce navigateur).';
 }
 $('pay').onclick = async () => {
@@ -1980,7 +2117,7 @@ $('pay').onclick = async () => {
 function renderLanding() {
   $('lStats').innerHTML = `<div><b>${nf(D.length)}</b><span>noms déjà à bord</span></div><div><b>${nf(ENF.anterieurs + NKIDS_DONE)}</b><span>enfants opérés avec Initiatives-Cœur</span></div><div><b>≈ 45 000 km</b><span>autour du monde au Vendée Globe</span></div>`;
   $('lExploreTxt').textContent = `les ${nf(D.length)} noms déjà à bord, les enfants qu'ils aident, la carte du monde`;
-  const li = $('lInvite'); if (PAR) { li.innerHTML = `<svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg><span><b>${esc(PAR.p)} ${esc(PAR.n)}</b> a mis son nom sur le bateau et vous invite à embarquer.</span>`; li.hidden = false; }
+  const li = $('lInvite'); if (PAR) { li.innerHTML = `<svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg><span><b>${esc(PAR.p)} ${esc(PAR.n)}</b> a mis son nom sur le bateau et t'invite à embarquer.</span>`; li.hidden = false; }
 }
 function showLanding() { closeDlg(); renderLanding(); setView('landing'); landingSpin = true; spotSlot = -1; $('spot').classList.remove('show'); $('alti').classList.remove('armed'); dirty = true; introLoop(); }
 function leaveLanding(to) { landingSpin = false; nav.cy = nav.el = undefined; stopAuto(); token++; spotSlot = -1; $('spot').classList.remove('show'); nav.tth = 0; nav.ts = 1.3; nav.td = D0; setView('home'); if (to) to(); }
