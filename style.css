@@ -345,7 +345,7 @@ input[type=file] { height: auto; padding: 10px; }
 /* ===================================================================== accueil (landing) */
 .app[data-view="landing"] .v-landing { display: grid; }
 .v-landing { gap: 18px; }
-.lh1 { font-size: clamp(50px, 6.2vw, 92px); }
+.lh1 { font-size: clamp(46px, 5vw, 78px); }
 .lsub { margin: -4px 0 0; font: 800 clamp(22px, 2.3vw, 32px)/1.05 var(--display); text-transform: uppercase; letter-spacing: .02em; color: var(--ecume); }
 .lstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .lstats div { background: var(--houle); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
@@ -542,3 +542,14 @@ a.dn:hover { color: var(--ciel); }
 @media (max-width: 520px) { .socpush { grid-template-columns: auto 1fr; } .socpush .btn { grid-column: 1 / -1; justify-self: stretch; } }
 .sframe { margin: 0; padding: 10px 12px; border-radius: 10px; background: rgba(244,200,66,.12); border: 1px solid rgba(244,200,66,.4); font-size: 14px; line-height: 1.4; }
 .sframe a { color: #fff; font-weight: 700; }
+/* photo de Violette sur l'accueil (fichier photos/violette.jpg) */
+.v-landing .intro { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-items: start; min-width: 0; }
+.v-landing { min-width: 0; }
+.v-landing .intro > * { grid-column: 1; }
+.v-landing .intro > .lead { grid-column: 1 / -1; }
+.v-landing .intro > .lphoto { grid-column: 2; grid-row: 1 / span 4; }
+.lphoto { margin: 4px 0 0; width: clamp(120px, 10.5vw, 160px); aspect-ratio: 4 / 5; border-radius: 16px; overflow: hidden; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,.4); border: 3px solid var(--coeur); }
+.lphoto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lphoto figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 10px 8px; font: 800 15px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; background: linear-gradient(transparent, rgba(7,22,41,.85)); }
+@media (max-width: 860px) { .lphoto { width: 104px; } .lphoto figcaption { font-size: 11px; padding: 12px 6px 5px; } }
+.lphoto figcaption small { display: block; margin-top: 3px; font: 400 9.5px/1.2 var(--body); letter-spacing: 0; text-transform: none; opacity: .8; }
