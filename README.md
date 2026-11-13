@@ -93,6 +93,7 @@ puis ouvrir http://localhost:8000.
 
 - **Tout en « tu »** sur le site.
 - **Boutique solidaire** : https://alexolivier.fr/109-boutique-initiatives-coeur (`boutique_url`).
-- **Cockpit, déco « portraits » (essai)** : sur la cloison blanche, deux portraits d'enfants tissés avec les noms des donateurs du cockpit (graisse, corps et couleur suivent l'image), et au centre les emplacements réservés aux logos (Mécénat Chirurgie Cardiaque, Initiatives-Cœur, partenaires). Le bouton « Grille » montre les places ; le choix d'une place se fait toujours sur la grille. Toucher un nom ouvre la fiche du donateur.
+- **Cockpit en portraits** : les places du cockpit sont des cases sur deux portraits d'enfants (941 dans la démo). Chaque nom dessine un morceau du visage (graisse et couleur suivent la photo détourée) ; une place libre reste un trait pâle, le portrait devient plus net à chaque nom. Au choix de la place, les cases libres sont en vert, sur les portraits. Au centre, les emplacements réservés aux logos (Mécénat Chirurgie Cardiaque, Initiatives-Cœur, partenaires). Les cases sont calculées par `cockpit_cells.py` à partir des photos détourées (`enfants/typo/`) et rangées dans `data/mat.json` → `cockpit.cells` ; changer de portrait = relancer le script.
+- **Vidéos du bord** : le site annonce que, pendant les courses, les noms peuvent apparaître dans les vidéos de Violette (accueil, choix mât ou cockpit, contreparties, fiche après le don).
 - **Places libres habillées** : sur le mât et dans le cockpit, les cases libres affichent des cœurs pâles, des portraits d'enfants et de courtes phrases, en attendant les noms.
 - **Personnalités** : bios complétées (à faire valider, surtout Constance Schaerer et Nouchka Simic), visuels génériques.

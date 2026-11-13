@@ -483,8 +483,6 @@ a.dn:hover { color: var(--ciel); }
 .zone button.on { border-color: var(--coeur); background: rgba(229,32,46,.14); }
 .amounts button:disabled { opacity: .3; cursor: not-allowed; }
 .app.in-ck #btnCk { background: var(--coeur); }
-#btnDeco { display: none; }
-.app.in-ck #btnDeco { display: inline-flex; }
 /* page d'accueil : la 3D seule, sans les commandes */
 .app[data-view="landing"] .ctrls, .app[data-view="landing"] .alti, .app[data-view="landing"] .hint, .app[data-view="landing"] .face, .app[data-view="landing"] .proto { display: none; }
 
