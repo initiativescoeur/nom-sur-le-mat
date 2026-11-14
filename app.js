@@ -155,7 +155,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(36, 1, 0.03, 20000);
+const camera = new THREE.PerspectiveCamera(36, 1, 0.03, 20000), FOV0 = camera.fov;
 /* ---------- ciel : HDRI « Kloofendal 48d partly cloudy (pure sky) », Poly Haven, CC0 (le ciel du live et du simulateur)
    Fond, lumière d'ambiance du bateau (environnement), reflets de la mer. Le soleil de la scène est celui de l'image. */
 const tl = new THREE.TextureLoader();
@@ -527,7 +527,7 @@ const D0 = isMobile() ? 0.85 : 1.5;
 const nav = { s: 1.3, th: 0.0, d: D0, ts: 1.3, tth: 0.0, td: D0, vs: 0, vth: 0, auto: false };
 const visH = (d = nav.d) => 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
 const mpp = () => visH() / stage.clientHeight;                       // mètres par pixel à la surface du mât
-function closeD() { return clamp((stage.clientHeight * PITCH / 30) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))), 0.35, 1.6); }
+function closeD() { return clamp((stage.clientHeight * PITCH / 30) / (2 * Math.tan(THREE.MathUtils.degToRad(FOV0 / 2))), 0.35, 1.6); }   // champ du mât (pas celui du cockpit)
 const _m = new THREE.Matrix4(), _t = new THREE.Vector3(), _p = new THREE.Vector3(), _u = new THREE.Vector3();
 const NEAR0 = camera.near;
 function placeCamera() {
@@ -588,6 +588,10 @@ function placeBox(el, rect, pad = 4) {
   el.style.width = (rect.x1 - rect.x0 + 2 * pad) + 'px'; el.style.height = (rect.y1 - rect.y0 + 2 * pad) + 'px'; return true;
 }
 
+function fitLbl(el) {                 // l'étiquette du nom reste entière dans l'écran
+  const L = el.firstElementChild; if (!L) return; const w = L.offsetWidth, bx = parseFloat(el.style.left) || 0, bw = parseFloat(el.style.width) || 0;
+  const x = clamp(bx + bw / 2 - w / 2, 8, Math.max(8, stage.clientWidth - w - 8)); L.style.left = (x - bx) + 'px'; L.style.transform = 'none';
+}
 // sélection par rayon
 const ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
 
@@ -802,12 +806,18 @@ function ckTurn(v) { let d = v.yaw - ck.yaw; d = Math.atan2(Math.sin(d), Math.co
 function ckSet(v) { ck.yaw = ck.tyaw = v.yaw; ck.pitch = ck.tpitch = v.pitch; ck.fov = ck.tfov = v.fov; }
 const ckSide = () => Math.sin(ck.yaw) >= 0 ? 0 : 1;           // portrait regardé : bâbord (+x) ou tribord
 let camOverride = null;                                        // animation de caméra libre (entrée / sortie du cockpit)
-function mastPose(P, T, U) {                                   // même calcul que placeCamera, sans toucher la caméra
-  const k = THREE.MathUtils.smoothstep(nav.td, 2.5, 14), s = lerp(nav.ts, clamp(nav.ts, 6, 20), k);
-  const dir = XS.clone().multiplyScalar(Math.cos(nav.tth)).addScaledVector(CH, Math.sin(nav.tth)), axisP = B.clone().addScaledVector(AX, s);
+function mastPose(P, T, U, s0 = nav.ts, th = nav.tth, d = nav.td) {   // même calcul que placeCamera, sans toucher la caméra
+  const k = THREE.MathUtils.smoothstep(d, 2.5, 14), s = lerp(s0, clamp(s0, 6, 20), k);
+  const dir = XS.clone().multiplyScalar(Math.cos(th)).addScaledVector(CH, Math.sin(th)), axisP = B.clone().addScaledVector(AX, s);
   _bc.set(BOATC.x, nav.cy ?? BOATC.y, BOATC.z); T.copy(axisP).lerp(_bc, k);
-  P.copy(T).addScaledVector(dir, radiusAt(s, nav.tth) + nav.td).addScaledVector(WUP, k * nav.td * (nav.el ?? 0.18)); U.copy(AX).lerp(WUP, k).normalize();
+  P.copy(T).addScaledVector(dir, radiusAt(s, th) + d).addScaledVector(WUP, k * d * (nav.el ?? 0.18)); U.copy(AX).lerp(WUP, k).normalize();
 }
+const navPose = (s, th, d) => { const P = new THREE.Vector3(), T = new THREE.Vector3(), U = new THREE.Vector3(); mastPose(P, T, U, s, th, d); return { p: P, t: T, u: U, f: BASE_FOV }; };
+// tribord : le foc (J0) est établi de ce côté et descend en arrière du mât ; pour rejoindre un nom de tribord, on passe par l'arrière
+// du foc, entre sa chute et la grand-voile (écart d'angle vers l'arrière, distance) : d'abord loin, puis dans la fente, puis le nom
+const STB_SLOT = [[0.95, 7], [0.45, 1.8]];
+const stbIn = (t, sT, thE, dT) => [[t, sT, thE + STB_SLOT[0][0], STB_SLOT[0][1]], [t + 2.2, sT, thE + STB_SLOT[1][0], STB_SLOT[1][1]], [t + 4.2, sT, thE, dT]];
+const stbOut = (t, s0, thE, d0) => [[t, s0, thE, d0], [t + 2.0, s0, thE + STB_SLOT[1][0], STB_SLOT[1][1]], [t + 4.0, s0, thE + STB_SLOT[0][0], STB_SLOT[0][1]]];
 function flyPath(pts, ms, my) {      // pts = [{p, t, u}] ; trajectoire Catmull-Rom pour p, lissée pour t et u
   return new Promise(res => {
     const n = pts.length - 1, t0 = performance.now(); nav.auto = true;
@@ -827,21 +837,39 @@ function curPose() { const P = camera.position.clone(), D3 = new THREE.Vector3(0
   return { p: P, t: P.clone().addScaledVector(D3, ck.on ? 1 : Math.max(1, nav.d)), u: camera.up.clone(), f: camera.fov }; }
 const ckArrive = v => [{ p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 2.4, -5), u: WUP.clone(), f: BASE_FOV }, { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.5, -4.4), u: WUP.clone(), f: BASE_FOV },
   { p: ckEye.clone(), t: ckEye.clone().add(ckDir(v.yaw, v.pitch)), u: WUP.clone(), f: v.fov }];
-async function enterCockpit(v = ckViewPanel(0), my = ++token) {
+async function enterCockpit(v = ckViewPanel(0), my = ++token, via = null, intro = false) {
   loadPano();
-  stopAuto(); hideTip(); landingSpin = false; spotSlot = -1; $('spot').classList.remove('show');
+  stopAuto(); hideTip(); if (!intro) landingSpin = false; spotSlot = -1; $('spot').classList.remove('show');
   if (ck.on && !camOverride) { ckTurn(v); await sleep(reduce ? 0 : 650); return my === token; }   // déjà dans le cockpit : on tourne la tête
+  let back = null;
+  if (!via && !ck.on && !camOverride && Math.cos(nav.th) < 0 && nav.d < 6) {                        // près du mât à tribord : on ressort par l'arrière du foc
+    back = [nav.s, nav.th, nav.d]; if (!await flyKeys(stbOut(0, nav.s, nav.th, nav.d), my)) return false; via = [STB_AFT]; }
   const A = curPose(), out = A.p.clone().add(new THREE.Vector3(A.p.x, 0, A.p.z - B.z).setY(0).normalize().multiplyScalar(3)).setY(Math.max(A.p.y, 4));
-  const pts = [A, { p: out, t: A.t.clone().lerp(new THREE.Vector3(0, 3, -4), .5), u: WUP.clone(), f: BASE_FOV }, ...ckArrive(v)];
+  const pts = via ? [A, ...via, ...ckArrive(v).slice(1)] : [A, { p: out, t: A.t.clone().lerp(new THREE.Vector3(0, 3, -4), .5), u: WUP.clone(), f: BASE_FOV }, ...ckArrive(v)];
   setCkMode(true); ckSet(v);
-  audioInit(); ambOn(); const ok = await flyPath(pts, 4200, my); setTimeout(() => ambOff(), 1200); if (ok) ckHint(); return ok;
+  audioInit(); ambOn(); const fp = flyPath(pts, 4200, my);
+  if (back) { nav.s = nav.ts = back[0]; nav.th = nav.tth = back[1]; nav.d = nav.td = back[2]; }      // en ressortant, on retrouvera ce nom
+  const ok = await fp; setTimeout(() => ambOff(), 1200); if (ok && !landingSpin) ckHint(); return ok;
 }
 async function leaveCockpit(my = ++token) {
   if (!ck.on) return true; hideTip(); spotSlot = -1; $('spot').classList.remove('show');
+  if (Math.cos(nav.tth) < 0 && nav.td < 6) {                     // retour près du mât à tribord : par l'arrière du bateau et du foc
+    const s0 = nav.ts, th = nav.tth, d = nav.td;
+    if (!await leaveCockpitVia([STB_AFT], [s0, th + STB_SLOT[0][0], STB_SLOT[0][1]], 4200, my)) return false;
+    return flyKeys(stbIn(0, s0, th, d), my); }
   const A = curPose(), P = new THREE.Vector3(), T = new THREE.Vector3(), U = new THREE.Vector3(); mastPose(P, T, U);
   const pts = [A, { p: ckEye.clone().add(new THREE.Vector3(0, 0.15, -0.6)), t: new THREE.Vector3(0, 1.5, -3.5), u: WUP.clone(), f: Math.min(70, Math.max(A.f, BASE_FOV)) },
     { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.6, -4), u: WUP.clone(), f: BASE_FOV }, { p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 3, -5), u: WUP.clone(), f: BASE_FOV }, { p: P, t: T, u: U, f: BASE_FOV }];
   setCkMode(false); const ok = await flyPath(pts, 3800, my); return ok;
+}
+const CK_AFT = () => [{ p: ckEye.clone().add(new THREE.Vector3(0, 0.15, -0.6)), t: new THREE.Vector3(0, 1.5, -3.5), u: WUP.clone(), f: BASE_FOV },
+  { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.6, -4), u: WUP.clone(), f: BASE_FOV }];
+const STB_AFT = { p: new THREE.Vector3(-5, 4.5, -12), t: new THREE.Vector3(-1, 3.5, -4), u: WUP.clone(), f: BASE_FOV };   // derrière le bateau, à tribord
+async function leaveCockpitVia(via, end, ms, my) {          // via : poses de passage après l'arrière du cockpit ; end = [s, th, d] sur le mât
+  if (!ck.on) return true; hideTip(); spotCk = -1; $('spot').classList.remove('show');
+  const E = navPose(...end); setCkMode(false); const ok = await flyPath([curPose(), ...CK_AFT(), ...via, E], ms, my);
+  if (ok) { nav.s = nav.ts = end[0]; nav.th = nav.tth = end[1]; nav.d = nav.td = end[2]; dirty = true; }
+  return ok;
 }
 const HINT0 = $('hint').textContent;
 function ckHint() { $('hint').textContent = 'Glisse pour regarder tout autour de toi (360°) · pince ou molette pour zoomer'; hint(true); clearTimeout(hintTimer); hintTimer = setTimeout(() => hint(false), 7000); }
@@ -921,8 +949,8 @@ function updateOverlays() {
   $('flipTxt').textContent = ck.on ? ckKidName(1 - ckSide()) : Math.cos(nav.th) >= 0 ? FACEN[1] : FACEN[0];
   if (ck.on || camOverride) $('faceLbl').textContent = ck.on ? 'Cockpit' : $('faceLbl').textContent;
   const sp = $('spot');
-  if (spotCk >= 0 && ck.on && !camOverride) placeBox(sp, ckRect(spotCk), 5);
-  else if (spotSlot >= 0 && !ck.on) placeBox(sp, screenRect(spotSlot, spotWhole), 5);
+  if (spotCk >= 0 && ck.on && !camOverride) { if (placeBox(sp, ckRect(spotCk), 5)) fitLbl(sp); }
+  else if (spotSlot >= 0 && !ck.on) { if (placeBox(sp, screenRect(spotSlot, spotWhole), 5)) fitLbl(sp); }
   const hv = $('hover');
   if (hoverSlot >= 0 && !ck.on && !(spotSlot >= 0 && hoverSlot === spotSlot)) { hv.classList.add('show'); placeBox(hv, screenRect(hoverSlot), 2); } else hv.classList.remove('show');
 }
@@ -1122,15 +1150,18 @@ async function survol() {
   if (ck.on) { spotCk = -1; if (!await leaveCockpit(my)) { $('btnSurvol').classList.remove('on'); return; } }
   if (o && !isCk(o)) { const { f, row } = dec(o.slot); back = { s: rowS(row), th: f === 0 ? 0 : Math.PI, d: closeD() }; }
   else if (!ckBack) { const f = Math.cos(nav.th) >= 0 ? 0 : 1; back = { s: namedS(f, nav.s), th: f ? Math.PI : 0, d: D0 }; }
-  const th0 = nav.th, TAU = Math.PI * 2, thE = back ? back.th + TAU * Math.round((th0 + TAU - back.th) / TAU) : th0 + 4.8;
-  const K = [[0, nav.s, th0, nav.d], [2.6, clamp(nav.s, 4, 20), th0 + 0.35, 13], [6.2, 15, th0 + 1.5, 32], [10.2, 16, th0 + 3.3, 36],
-    [13.8, 13, thE - 1.5, 24], ...(back ? [[17.2, back.s, thE - 0.25, 5], [19.6, back.s, thE, back.d]] : [])];
+  // départ près du mât à tribord : on sort d'abord par l'arrière du foc
+  const out = Math.cos(nav.th) < 0 && nav.d < 6, t = out ? 4.0 : 0, th0 = out ? nav.th + STB_SLOT[0][0] : nav.th, TAU = Math.PI * 2, stb = back && Math.cos(back.th) < 0;
+  const thE = !back ? th0 + 4.8 : stb ? back.th + TAU * Math.round((th0 + 3.3 + 1.0 - 0.3 - STB_SLOT[0][0] - back.th) / TAU) : back.th + TAU * Math.round((th0 + TAU - back.th) / TAU);
+  const K = [...(out ? stbOut(0, nav.s, nav.th, nav.d) : [[0, nav.s, th0, nav.d]]), [t + 2.6, clamp(nav.s, 4, 20), th0 + 0.35, 13], [t + 6.2, 15, th0 + 1.5, 32], [t + 10.2, 16, th0 + 3.3, 36],
+    ...(!back ? [[t + 13.8, 13, thE - 1.5, 24]] : stb ? [[t + 13.8, 13, thE + STB_SLOT[0][0] + 0.3, 22], ...stbIn(t + 16.6, back.s, thE, back.d)]
+      : [[t + 13.8, 13, thE - 1.5, 24], [t + 17.2, back.s, thE - 0.25, 5], [t + 19.6, back.s, thE, back.d]])];
   await flyKeys(K, my);
   $('btnSurvol').classList.remove('on'); setTimeout(() => { if (my === token) ambOff(); }, 1500);
   if (my !== token) return;
   if (ckBack === 'nom') { travelCk(o); return; }
   if (ckBack) { enterCockpit(ckBack, my);              // en sortant du cockpit ensuite, on retrouvera une face pleine de noms
-    const f = Math.cos(nav.th) >= 0 ? 0 : 1; nav.s = nav.ts = namedS(f, 6); nav.th = nav.tth = f ? Math.PI : 0; nav.d = nav.td = D0; return; }
+    nav.s = nav.ts = namedS(0, 6); nav.th = nav.tth = 0; nav.d = nav.td = D0; return; }
   nav.s = nav.ts = back.s; nav.th = nav.tth = back.th; nav.d = nav.td = back.d;
   if (o && hadSpot >= 0) { spotSlot = hadSpot; $('spot').classList.add('show'); } dirty = true;
 }
@@ -2467,23 +2498,58 @@ function renderLanding() {
   const li = $('lInvite'); if (PAR) { li.innerHTML = `<svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg><span><b>${esc(PAR.p)} ${esc(PAR.n)}</b> a mis son nom sur le bateau et t'invite à embarquer.</span>`; li.hidden = false; }
 }
 function showLanding() { closeDlg(); renderLanding(); setView('landing'); landingSpin = true; spotSlot = -1; $('spot').classList.remove('show'); $('alti').classList.remove('armed'); dirty = true; introLoop(); }
-function leaveLanding(to) { landingSpin = false; nav.cy = nav.el = undefined; stopAuto(); token++; spotSlot = -1; $('spot').classList.remove('show'); nav.tth = 0; nav.ts = 1.3; nav.td = D0; setView('home'); if (to) to(); }
-// intro : plan large sur le bateau qui navigue, puis plongée vers un nom tiré au hasard, et ainsi de suite
+function leaveLanding(to) { landingSpin = false; nav.cy = nav.el = undefined; stopAuto(); token++; spotSlot = -1; spotCk = -1; $('spot').classList.remove('show'); nav.tth = 0; nav.ts = 1.3; nav.td = D0; setView('home');
+  const tk = token; if (to) to(); if (ck.on && token === tk) { nav.s = nav.ts; nav.th = nav.tth; nav.d = nav.td; leaveCockpit(); } }
+// intro : plan large sur le bateau qui navigue, puis un cycle : un nom à bâbord, un nom du portrait bâbord du cockpit,
+// un nom à tribord (en passant par l'arrière du foc), un nom du portrait tribord ; et on recommence avec d'autres noms
 async function introLoop() {
-  const my = ++token, WIDE = isMobile() ? 46 : 44, pool = D.filter(o => o.perso < 0 && !o.local && o.slot >= 0 && !isCk(o));
+  const my = ++token, WIDE = isMobile() ? 46 : 44, TAU = Math.PI * 2;
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const mastPool = [0, 1].map(f => D.filter(o => o.perso < 0 && !o.local && o.slot >= 0 && !isCk(o) && dec(o.slot).f === f));
+  const ckPool = [0, 1].map(k => { const a = []; for (let c = 0; c < CK.n; c++) { const i = ckOwner[c]; if (i >= 0 && CKC[c][0] === k && D[i].perso < 0 && !D[i].local) a.push(c); } return a; });
   const live = () => my === token && landingSpin && app.dataset.view === 'landing';
+  const near = (th, ref) => th + TAU * Math.round((ref - th) / TAU);      // même angle, au tour le plus proche de ref
+  const label = o => `${o.p} ${o.n}${o.v >= 0 ? ' · ' + VILLES[o.v] : ''}`;
+  const hold = async () => { await sleep(3400); $('spot').classList.remove('show'); spotSlot = -1; spotCk = -1; dirty = true; return live(); };
+  loadPano();
   nav.cy = 12; nav.el = -0.15;                        // plan large : on vise la coque et les voiles, horizon dans le cadre
   nav.auto = false; nav.s = nav.ts = 12; nav.th = nav.tth = 0.95; nav.d = nav.td = WIDE * 1.25; dirty = true;
   if (!await flyKeys([[0, 12, 0.95, WIDE * 1.25], [4.5, 12, 1.35, WIDE]], my) || !live()) return;
+  async function mastName(f) {                        // un nom sur le mât, face f
+    const pool = mastPool[f]; if (!pool.length) return true;
+    const o = pick(pool), { row } = dec(o.slot), sT = rowS(row), dT = closeD() * 1.1, thF = f === 0 ? 0 : Math.PI;
+    if (ck.on) {                                      // on sort du cockpit par l'arrière du bateau
+      if (f === 1) { if (!await leaveCockpitVia([STB_AFT], [sT, thF + STB_SLOT[0][0], STB_SLOT[0][1]], 4200, my) || !live()) return false;
+        if (!await flyKeys(stbIn(0, sT, nav.th - STB_SLOT[0][0], dT), my) || !live()) return false; }
+      else { const sM = clamp(sT, 6, 16);
+        if (!await leaveCockpitVia([{ p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 3, -5), u: WUP.clone(), f: BASE_FOV }], [sM, -0.5, 16], 3800, my) || !live()) return false;
+        if (!await flyKeys([[0, nav.s, nav.th, nav.d], [2.6, lerp(nav.s, sT, 0.6), -0.15, 6], [5.0, sT, 0, dT]], my) || !live()) return false; }
+    } else if (f === 0) {                             // depuis le plan large, côté bâbord (loin du foc)
+      const thW = near(0.55, nav.th);
+      if (!await flyKeys([[0, nav.s, nav.th, nav.d], [4.2, 12, thW, WIDE * 0.95]], my) || !live()) return false;
+      if (!await flyKeys([[0, nav.s, nav.th, nav.d], [2.6, lerp(nav.s, sT, 0.6), lerp(nav.th, near(0, thW), 0.7), 9], [5.4, sT, near(0, thW), dT]], my) || !live()) return false;
+    } else {                                          // depuis le plan large, côté tribord : tour par l'arrière
+      const thE = near(Math.PI, nav.th + 1);
+      if (!await flyKeys([[0, nav.s, nav.th, nav.d], [3.4, lerp(nav.s, sT, 0.5), thE + STB_SLOT[0][0] + 0.3, 20], ...stbIn(6.2, sT, thE, dT)], my) || !live()) return false;
+    }
+    spotSlot = o.slot; spotWhole = false; $('spotTxt').textContent = label(o); $('spot').classList.add('show'); dirty = true;
+    return hold();
+  }
+  async function ckName(k) {                          // le portrait k du cockpit (0 = bâbord, 1 = tribord), puis un nom dessus
+    const v = ckViewPanel(k); if (PANO) v.fov = clamp(v.fov * 1.25, 30, 66);
+    if (Math.cos(nav.th) < 0 && nav.d < 6) {          // depuis un nom de tribord : on ressort par l'arrière du foc
+      if (!await flyKeys(stbOut(0, nav.s, nav.th, nav.d), my) || !live()) return false;
+      if (!await enterCockpit(v, my, [STB_AFT], true) || !live()) return false;
+    } else if (!await enterCockpit(v, my, null, true) || !live()) return false;
+    await sleep(1600); if (!live()) return false;
+    const pool = ckPool[k]; if (!pool.length) return true;
+    const c = pick(pool), o = D[ckOwner[c]];
+    ckTurn(ckViewCell(c, ckReadVis(c) * 0.5)); await sleep(1600); if (!live()) return false;
+    spotCk = c; $('spotTxt').textContent = label(o); $('spot').classList.add('show'); dirty = true;
+    return hold();
+  }
   while (live()) {
-    const o = pool[Math.floor(Math.random() * pool.length)], { f, row } = dec(o.slot), sT = rowS(row), thT = f === 0 ? 0 : Math.PI, dT = closeD() * 1.1;
-    const thW = f === 0 ? 0.55 : Math.PI - 0.55;                 // on se place d'abord du côté du nom, loin du foc
-    if (!await flyKeys([[0, nav.s, nav.th, nav.d], [4.2, 12, thW, WIDE * 0.95]], my) || !live()) return;
-    if (!await flyKeys([[0, nav.s, nav.th, nav.d], [2.6, lerp(nav.s, sT, 0.6), lerp(nav.th, thT, 0.7), 9], [5.4, sT, thT, dT]], my) || !live()) return;
-    spotSlot = o.slot; spotWhole = false; $('spotTxt').textContent = `${o.p} ${o.n}${o.v >= 0 ? ' · ' + VILLES[o.v] : ''}`; $('spot').classList.add('show'); dirty = true;
-    await sleep(3400); if (!live()) return;
-    $('spot').classList.remove('show'); spotSlot = -1; dirty = true;
-    if (!await flyKeys([[0, nav.s, nav.th, nav.d], [2.8, clamp(nav.s, 8, 16), lerp(nav.th, thW, 0.6), 10], [5.6, 12, thW + (f === 0 ? 0.5 : -0.5), WIDE]], my) || !live()) return;
+    if (!await mastName(0) || !await ckName(0) || !await mastName(1) || !await ckName(1)) return;
   }
 }
 $('lDon').onclick = () => leaveLanding(startDon);
@@ -2506,4 +2572,4 @@ addEventListener('hashchange', fromHash);
 requestAnimationFrame(frame);
 setTimeout(() => $('loading').classList.add('done'), 150);
 if (!location.hash) showLanding(); else fromHash();
-window.__dbg = {}; window.__mat = { camera, rig, boat, THREE, nav, D, owner, dec, enc, rowS, travel, tour, startDon, pickAt, screenRect, tiles, renderer, ck, ckTurn, ckViewPanel, ckPanels, makeCard, openSocial, pano, ckEye, get dirty() { return dirty; }, set dirty(v) { dirty = v; } };
+window.__dbg = {}; window.__mat = { navPose, survol, camera, rig, boat, THREE, nav, D, owner, dec, enc, rowS, travel, tour, startDon, pickAt, screenRect, tiles, renderer, ck, ckTurn, ckViewPanel, ckPanels, makeCard, openSocial, pano, ckEye, get dirty() { return dirty; }, set dirty(v) { dirty = v; } };

@@ -129,4 +129,7 @@ puis ouvrir http://localhost:8000.
 
 - **Bâbord / Tribord** : le bouton passe de l'autre côté du mât ; si l'on était au pied du mât ou devant une zone vide, la vue remonte jusqu'à la série de noms la plus proche.
 - **Survol** : le vol se termine sur le nom recherché ; sans nom recherché, sur la face bâbord ou tribord, devant une série de noms (jamais sur la tranche du mât) ; lancé depuis le cockpit, il ramène dans le cockpit.
+- **Le foc ne se traverse plus** : le J0 est établi à tribord et descend en arrière du mât. Pour rejoindre ou quitter un nom de tribord (survol, accueil, entrée et sortie du cockpit), la caméra passe par l'arrière du bateau puis entre la chute du foc et la grand-voile (réglage `STB_SLOT` dans `app.js`).
+- **Accueil** : après le plan large, l'animation tourne en boucle : un nom à bâbord, un nom du portrait bâbord du cockpit (Aminata), un nom à tribord, un nom du portrait tribord (Yacine), puis d'autres noms. Un toucher sur la scène ou n'importe quel bouton l'arrête.
+- **Photo de Violette** (accueil) : elle occupe toute la hauteur du titre et du sous-titre, à droite (fichier `photos/violette.jpg`, cadrage sur le visage).
 - **Étape du don** : le prénom de l'enfant (« l'opération de Yacine, 12 ans ») ouvre sa fiche.
