@@ -117,3 +117,10 @@ puis ouvrir http://localhost:8000.
 - **Les logos des partenaires** : « Les Chocolats du Cœur » et « K·LINE », dans leur cœur, à leur place exacte sur les deux parois ; redessinés à partir des fichiers vectoriels (`App-Ecrans-RDR-2026/assets/logos/sponsors/`), le tracé du cœur relevé sur le scan.
 - **Fichiers** : `cockpit360/` (six faces de 2048 px en WebP, une version 1024 px pour les téléphones dans `cockpit360/m/`, et `cockpit360.json` : point de vue, faces, panneaux). Fabriqués par `outils-cockpit360/build_pano.py` (rendu des taches gaussiennes du scan, effacement des portraits, logos), à relancer si le scan ou les emplacements changent.
 
+
+## Mer et ciel (rendu du simulateur)
+
+- **Le ciel** : un vrai ciel photographié en HDR (Poly Haven, « Kloofendal 48d Partly Cloudy (Pure Sky) », licence CC0, aucune mention obligatoire), le même principe que le simulateur du live : il éclaire le bateau (reflets sur la coque et les voiles) et donne la position du soleil, calculée à partir du point le plus lumineux de l'image. Fichier `assets/ciel-4k.jpg` (format UltraHDR, 0,6 Mo, lu par `vendor/addons/loaders/UltraHDRLoader.js`) ; si le navigateur ne sait pas le lire, l'ancien `assets/sky.jpg` prend le relais. Orientation réglable dans `data/config.json` → `ciel_rotation` (degrés, 128 par défaut).
+- **La mer** : refaite pour ce site, libre de droits. Huit trains de houle (vagues de Gerstner) sur une grille qui suit la caméra jusqu'à l'horizon, reflets du ciel avec l'effet Fresnel, reflet du soleil, écume sur les crêtes et sillage blanc derrière le bateau, brume d'horizon. Hauteur des vagues réglable dans `data/config.json` → `mer_amplitude` (1,15 par défaut ; 0,6 pour une mer calme).
+- **Les ombres** : le soleil projette l'ombre des voiles et du gréement sur le pont, sur ordinateur seulement (désactivées sur téléphone pour garder la fluidité).
+- **Pourquoi pas Three.js Water Pro** : la mer du live utilise Water Pro, sous licence commerciale ; elle ne peut pas aller dans un dépôt public comme celui-ci. La mer de ce site s'en approche sans en reprendre le code.

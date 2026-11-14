@@ -2,6 +2,7 @@
    Mât 3D interactif (modèle réel du bateau), plan des places, parcours de don, base de la générosité. */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { UltraHDRLoader } from 'three/addons/loaders/UltraHDRLoader.js';
 
 const $ = id => document.getElementById(id);
 const app = $('app'), stage = $('stage'), canvas = $('gl');
@@ -155,49 +156,119 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(36, 1, 0.03, 20000);
-const sunDir = new THREE.Vector3(0.62, 0.56, 0.55).normalize();
+/* ---------- ciel : HDRI « Kloofendal 48d partly cloudy (pure sky) », Poly Haven, CC0 (le ciel du live et du simulateur)
+   Fond, lumière d'ambiance du bateau (environnement), reflets de la mer. Le soleil de la scène est celui de l'image. */
 const tl = new THREE.TextureLoader();
-const skyTex = await tl.loadAsync('assets/sky.jpg'); skyTex.colorSpace = THREE.SRGBColorSpace;
-const mkDome = () => { const m = new THREE.Mesh(new THREE.SphereGeometry(9000, 64, 32), new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, depthWrite: false, toneMapped: false })); m.renderOrder = -1; return m; };
+const SKY_YAW = THREE.MathUtils.degToRad(CFG.ciel_rotation ?? 128);        // tourne le ciel : le soleil éclaire les noms du flanc bâbord
+let skyHDR = null, skyLDR = false;
+try { skyHDR = await new UltraHDRLoader().setDataType(THREE.HalfFloatType).loadAsync('assets/ciel-4k.jpg'); }
+catch (e) { skyHDR = await tl.loadAsync('assets/sky.jpg'); skyHDR.colorSpace = THREE.SRGBColorSpace; skyLDR = true; }
+skyHDR.mapping = THREE.EquirectangularReflectionMapping; skyHDR.wrapS = THREE.RepeatWrapping; skyHDR.minFilter = THREE.LinearFilter; skyHDR.generateMipmaps = false; skyHDR.needsUpdate = true;
+const rotY = (v, a) => new THREE.Vector3(v.x * Math.cos(a) - v.z * Math.sin(a), v.y, v.x * Math.sin(a) + v.z * Math.cos(a));
+// le soleil : le point le plus lumineux de l'image (sens de lecture de three : equirectUv)
+const sunDir = (() => {
+  const img = skyHDR.image; if (skyLDR || !img || !img.data) return new THREE.Vector3(0.62, 0.56, 0.55).normalize();
+  const { width: W, height: H, data } = img, f = THREE.DataUtils.fromHalfFloat; let best = -1, bx = 0, by = 0;
+  for (let y = 0; y < H / 2; y += 2) for (let x = 0; x < W; x += 2) { const i = (y * W + x) * 4, l = f(data[i]) + f(data[i + 1]) + f(data[i + 2]); if (l > best) { best = l; bx = x; by = y; } }
+  const u = (bx + 0.5) / W, v = 1 - (by + 0.5) / H, phi = (u - 0.5) * 2 * Math.PI, th = (v - 0.5) * Math.PI;   // inverse d'equirectUv (image retournée)
+  return rotY(new THREE.Vector3(Math.cos(th) * Math.cos(phi), Math.sin(th), Math.cos(th) * Math.sin(phi)), SKY_YAW).normalize();
+})();
+const SKY_GLSL = `uniform sampler2D sky; uniform float skyYaw, skyGain;
+  vec3 skyAt(vec3 d){ float c = cos(-skyYaw), s = sin(-skyYaw); d = vec3(d.x * c - d.z * s, d.y, d.x * s + d.z * c);
+    vec2 uv = vec2(atan(d.z, d.x) * 0.15915494 + 0.5, asin(clamp(d.y, -1., 1.)) * 0.31830988 + 0.5); return texture2D(sky, uv).rgb * skyGain; }`;
+const skyU = () => ({ sky: { value: skyHDR }, skyYaw: { value: SKY_YAW }, skyGain: { value: skyLDR ? 1.0 : 0.9 } });
+const mkDome = () => { const m = new THREE.Mesh(new THREE.SphereGeometry(9000, 64, 32), new THREE.ShaderMaterial({ uniforms: skyU(), side: THREE.BackSide, depthWrite: false,
+  vertexShader: 'varying vec3 vD; void main(){ vD = (modelMatrix * vec4(position, 1.)).xyz; gl_Position = projectionMatrix * viewMatrix * vec4(vD, 1.); }',
+  fragmentShader: SKY_GLSL + `varying vec3 vD; void main(){ vec3 d = normalize(vD); d.y = max(d.y, 0.002); gl_FragColor = vec4(skyAt(d), 1.);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }` })); m.renderOrder = -1; m.frustumCulled = false; return m; };
 scene.add(mkDome());
 const envScene = new THREE.Scene(); envScene.add(mkDome());
-const envSea = new THREE.Mesh(new THREE.CircleGeometry(5000, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x123f60, toneMapped: false }));
+const envSea = new THREE.Mesh(new THREE.CircleGeometry(5000, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0b2c44, toneMapped: false }));
 envSea.position.y = -2; envScene.add(envSea);
-const cubeRT = new THREE.WebGLCubeRenderTarget(128); const cubeCam = new THREE.CubeCamera(0.5, 20000, cubeRT); cubeCam.position.set(0, 15, 0); cubeCam.update(renderer, envScene);
+const cubeRT = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType }); const cubeCam = new THREE.CubeCamera(0.5, 20000, cubeRT); cubeCam.position.set(0, 15, 0); cubeCam.update(renderer, envScene);
 const ENV = cubeRT.texture;
-const sun = new THREE.DirectionalLight(0xfff4e6, 2.5); sun.position.copy(sunDir).multiplyScalar(50); scene.add(sun);
-const fill = new THREE.DirectionalLight(0xdfe9ff, 1.1); fill.position.set(-35, 22, 10); scene.add(fill);
-scene.add(new THREE.HemisphereLight(0xcfe2ff, 0x2a4a64, 1.15)); scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+{ const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromCubemap(cubeRT.texture).texture; scene.environmentIntensity = 0.85; pm.dispose(); }
+const sun = new THREE.DirectionalLight(0xfff1de, 2.6); sun.position.copy(sunDir).multiplyScalar(60); scene.add(sun);
+if (!isMobile()) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 26, bottom: -22, near: 10, far: 130 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03; sun.target.position.set(0, 8, 0); scene.add(sun.target); }
+const fill = new THREE.DirectionalLight(0xdfe9ff, 0.55); fill.position.set(-35, 22, 10); scene.add(fill);
+scene.add(new THREE.HemisphereLight(0xcfe2ff, 0x2a4a64, 0.75)); scene.add(new THREE.AmbientLight(0xffffff, 0.15));
 
+/* ---------- mer : houle de Gerstner (huit trains de vagues, « belle brise, mer formée »), reflets du ciel, écume des crêtes,
+   sillage et vague d'étrave. Libre de droits (Water Pro, sous licence commerciale, ne peut pas aller dans un dépôt public).
+   La grille, dense sous la caméra, la suit ; la houle s'apaise près de la coque (le bateau ne monte pas sur les vagues). */
 const wn = await tl.loadAsync('assets/waternormals.png'); wn.wrapS = wn.wrapT = THREE.RepeatWrapping;
+const WAVES = [[62, .55, 0, 1], [41, .38, 22, 1.1], [27, .24, -31, 1.2], [17, .15, 47, 1.3], [11, .09, -12, 1.4], [7.3, .055, 65, 1.4], [4.6, .032, -55, 1.5], [2.9, .02, 18, 1.5]];
+const WAVE_DIR = -100;                                              // la houle vient de l'avant tribord (degrés, 0 = vers +x)
+const waveU = WAVES.map(([L, A, ang, q]) => { const a = THREE.MathUtils.degToRad(WAVE_DIR + ang), k = 2 * Math.PI / L; return new THREE.Vector4(Math.cos(a), Math.sin(a), k, A); });
+const waveQ = WAVES.map(w => w[3]);
 const seaMat = new THREE.ShaderMaterial({
-  uniforms: { nmap: { value: wn }, env: { value: ENV }, time: { value: 0 }, flow: { value: 0 }, sunDir: { value: sunDir }, deep: { value: new THREE.Color(0x0a3a5e) }, camPos: { value: new THREE.Vector3() } },
-  vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
-  fragmentShader: `uniform sampler2D nmap; uniform samplerCube env; uniform float time, flow; uniform vec3 sunDir, deep, camPos; varying vec3 vW;
+  uniforms: Object.assign(skyU(), { nmap: { value: wn }, time: { value: 0 }, flow: { value: 0 }, sunDir: { value: sunDir }, camPos: { value: new THREE.Vector3() },
+    waves: { value: waveU }, waveQ: { value: waveQ }, amp: { value: CFG.mer_amplitude ?? 1.15 }, choppy: { value: 2.2 },
+    deep: { value: new THREE.Color(0.006, 0.020, 0.034) }, scatter: { value: new THREE.Color(0.012, 0.075, 0.085) } }),
+  vertexShader: `uniform vec4 waves[8]; uniform float waveQ[8]; uniform float time, flow, amp, choppy; uniform vec3 camPos;
+    varying vec3 vW; varying vec3 vN; varying float vCrest, vH;
+    void main(){
+      vec3 w = (modelMatrix * vec4(position, 1.)).xyz; vec2 p = w.xz + vec2(0., flow);
+      // près de la coque (ellipse autour du bateau) et au loin, la houle s'efface
+      float e = length(vec2(w.x / 6.5, (w.z - 1.4) / 15.5)), near = mix(0.10, 1., smoothstep(1.0, 2.8, e));
+      float far = 1. - smoothstep(500., 2600., length(w.xz - camPos.xz)), a0 = amp * near * far;
+      vec3 d = vec3(0.); vec3 n = vec3(0., 1., 0.); float fold = 0.;
+      for (int i = 0; i < 8; i++) {
+        vec4 W = waves[i]; float k = W.z, A = W.w * a0, om = sqrt(9.81 * k), th = k * dot(W.xy, p) - om * time, c = cos(th), s = sin(th), Q = 0.045 * waveQ[i] * choppy / (k * W.w);
+        d.x += Q * A * W.x * c; d.z += Q * A * W.y * c; d.y += A * s;
+        n.x -= W.x * k * A * c; n.z -= W.y * k * A * c; n.y -= Q * k * A * s; fold += Q * k * A * s;
+      }
+      w += d; vW = w; vN = n; vCrest = fold; vH = d.y; gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.);
+    }`,
+  fragmentShader: SKY_GLSL + `uniform sampler2D nmap; uniform float time, flow; uniform vec3 sunDir, camPos, deep, scatter; varying vec3 vW; varying vec3 vN; varying float vCrest, vH;
     vec3 nrm(vec2 p){ p += vec2(0., flow); vec3 a = texture2D(nmap, p*0.045 + vec2(time*0.011, time*0.007)).xzy*2.-1.;
       vec3 b = texture2D(nmap, p*0.11 + vec2(-time*0.013, time*0.017)).xzy*2.-1.;
       vec3 c = texture2D(nmap, p*0.012 + vec2(time*0.004, -time*0.003)).xzy*2.-1.;
-      return normalize(a + b*0.6 + c*1.2 + vec3(0., 2.2, 0.)); }
-    // écume : sillage derrière la poupe (z < -8,8 m), vague d'étrave et bord de coque ; le bateau file vers +z
+      return normalize(a + b*0.7 + c*1.1 + vec3(0., 1.7, 0.)); }
     float hullW(float z){ return z < -2. ? mix(2.55, 2.9, clamp((z + 8.8) / 6.8, 0., 1.)) : 2.9 * sqrt(max(0., 1. - pow((z + 2.) / 13.4, 2.))); }
     float foam(vec2 p){ float x = abs(p.x), z = p.y, f = 0.;
-      if (z < -8.6) { float t = -z - 8.6; f += exp(-pow(x / (1.4 + t * 0.12), 2.)) * exp(-t / 70.) * 0.9;
-        f += exp(-pow((x - 2.2 - t * 0.33) / (0.5 + t * 0.045), 2.)) * exp(-t / 40.) * 0.75; }
-      if (z > -8.8 && z < 11.6) { float w = hullW(z); f += exp(-pow((x - w - 0.2) / (0.35 + 0.25 * smoothstep(8., 11.5, z)), 2.)) * (0.45 + 0.5 * smoothstep(4., 11.4, z)); }
+      if (z < -8.6) { float t = -z - 8.6; f += exp(-pow(x / (2.2 + t * 0.16), 2.)) * exp(-t / 90.) * 1.1;
+        f += exp(-pow((x - 2.4 - t * 0.33) / (0.8 + t * 0.06), 2.)) * exp(-t / 55.) * 0.9; }
+      if (z > -8.8 && z < 11.6) { float w = hullW(z); f += exp(-pow((x - w - 0.35) / (0.6 + 0.45 * smoothstep(6., 11.5, z)), 2.)) * (0.6 + 0.6 * smoothstep(3., 11.4, z)); }
       return f; }
-    void main(){ vec3 V = normalize(camPos - vW); float d = length(camPos - vW);
-      vec3 N = normalize(mix(nrm(vW.xz), vec3(0.,1.,0.), clamp(d/2500., 0., .85)));
-      vec3 R = reflect(-V, N); R.y = abs(R.y);
-      float fr = 0.02 + 0.6 * pow(1. - max(dot(N, V), 0.), 5.);
-      vec3 col = mix(deep * (0.65 + 0.35 * max(dot(N, sunDir), 0.)), textureCube(env, R).rgb * 0.85, fr) + vec3(1., .95, .85) * pow(max(dot(R, sunDir), 0.), 220.) * 7.;
-      vec2 q = vW.xz + vec2(0., flow); float n1 = texture2D(nmap, q * 0.31).r, n2 = texture2D(nmap, q * 0.083 + 0.37).g;
-      float fo = smoothstep(0.32, 0.85, foam(vW.xz) * (0.45 + 0.9 * n1 * n2 * 1.6));
-      col = mix(col, vec3(0.9, 0.94, 0.97), fo * 0.88);
+    void main(){
+      vec3 V = normalize(camPos - vW); float dist = length(camPos - vW);
+      vec3 Ng = normalize(vN), Nd = nrm(vW.xz); float fd = clamp(dist / 900., 0., 0.9);
+      vec3 N = normalize(vec3(Ng.x + Nd.x * (1. - fd) * 1.15, Ng.y, Ng.z + Nd.z * (1. - fd) * 1.15));
+      vec3 R = reflect(-V, N); R.y = abs(R.y) + 0.01;
+      float cosT = max(dot(N, V), 0.), F = min(0.02 + 0.98 * pow(1. - cosT, 5.), 0.75);
+      vec3 Rn = normalize(R), T1 = normalize(cross(Rn, vec3(0., 1., 0.)) + 1e-4), T2 = cross(T1, Rn);   // mer rugueuse : reflet adouci (quatre visées)
+      vec3 refl = (skyAt(Rn) * 2. + skyAt(normalize(Rn + T1 * 0.06)) + skyAt(normalize(Rn - T1 * 0.06)) + skyAt(normalize(Rn + T2 * 0.05))) / 5. * 0.72;
+      float sunUp = max(sunDir.y, 0.05), ndl = max(dot(N, sunDir), 0.);
+      vec3 body = deep * (0.35 + 0.65 * ndl) * (0.6 + 0.4 * sunUp);
+      float h = clamp(vH / 0.9 + 0.35, 0., 1.), back = pow(max(dot(V, -sunDir) * 0.5 + 0.5, 0.), 3.);
+      body += scatter * h * (0.25 + 0.75 * back) * (0.5 + 0.5 * ndl);
+      float sd = max(dot(R, sunDir), 0.);   // reflet du soleil : scintillement fin et nappe douce
+      vec3 col = mix(body, refl, F) + vec3(1., .93, .8) * (pow(sd, 1400.) * 5. + pow(sd, 90.) * 0.18) * (1. - fd);
+      // écume : crêtes qui se replient, et sillage du bateau
+      vec2 q = vW.xz + vec2(0., flow); float n1 = texture2D(nmap, q * 0.31 + time * 0.02).r, n2 = texture2D(nmap, q * 0.083 + 0.37).g;
+      float crest = smoothstep(0.36, 0.86, vCrest + (n1 - 0.5) * 0.35) * (1. - fd) * (0.3 + 0.8 * n2 * n1);
+      float fo = max(crest * 0.75, smoothstep(0.32, 0.85, foam(vW.xz) * (0.45 + 0.9 * n1 * n2 * 1.6)));
+      col = mix(col, vec3(0.88, 0.92, 0.95) * (0.75 + 0.25 * ndl), fo * 0.9);
+      // brume de l'horizon : la mer se fond dans le ciel
+      vec3 hz = skyAt(normalize(vec3(-V.x, 0.015, -V.z)));
+      col = mix(col, hz, smoothstep(0., 1., 1. - exp(-dist / 5200.)));
       gl_FragColor = vec4(col, 1.);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
     }` });
-const water = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), seaMat); water.position.y = 0.45; scene.add(water);
+const seaGeo = (() => {                       // anneaux de plus en plus espacés : 25 cm sous la caméra, plusieurs km à l'horizon
+  const NR = isMobile() ? 130 : 200, NA = isMobile() ? 220 : 360, b = (6000 - 0.25 * NR) / NR ** 3, P = [], I = [];
+  for (let i = 0; i <= NR; i++) { const r = 0.25 * i + b * i ** 3; for (let j = 0; j < NA; j++) { const a = j / NA * Math.PI * 2; P.push(r * Math.cos(a), 0, r * Math.sin(a)); } }
+  for (let i = 0; i < NR; i++) for (let j = 0; j < NA; j++) { const a = i * NA + j, b2 = i * NA + (j + 1) % NA, c = a + NA, d = b2 + NA; I.push(a, b2, c, b2, d, c); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); return g;
+})();
+const water = new THREE.Mesh(seaGeo, seaMat); water.position.y = 0.45; water.frustumCulled = false; scene.add(water);
+const _wc = new THREE.Vector3();
+function followSea() { camera.getWorldPosition(_wc); water.position.x = Math.round(_wc.x / 0.5) * 0.5; water.position.z = Math.round(_wc.z / 0.5) * 0.5; }
 
 const BOAT_SPEED = 5.5;                       // m/s (≈ 11 nœuds) : la mer défile, le bateau navigue
 const rig = new THREE.Group(); scene.add(rig);
@@ -230,6 +301,7 @@ gltf.scene.traverse(o => {
   }
   g.setIndex(keep);
 });
+if (renderer.shadowMap.enabled) gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = !/^sail_/.test(o.name); } });
 boat.add(gltf.scene);
 
 const paint = new THREE.MeshPhongMaterial({ color: 0xeef1f4, specular: 0x6a6a6a, shininess: 70, envMap: ENV, reflectivity: 0.10, combine: THREE.MixOperation });
@@ -836,7 +908,7 @@ function frame(now) {
   if (moving || dirty || REC.film || now - lastRender > 45) {
     setRig(t); anemo.rotation.y = t * 9; seaMat.uniforms.time.value = t; seaMat.uniforms.flow.value = t * BOAT_SPEED;
     if (!window.__freeCam) placeCamera(); rig.updateMatrixWorld();
-    camera.getWorldPosition(seaMat.uniforms.camPos.value);
+    camera.getWorldPosition(seaMat.uniforms.camPos.value); followSea();
     if (now - lastLOD > 120 || dirty) { updateLOD(); lastLOD = now; }
     renderer.render(scene, camera); lastRender = now; dirty = false; if (REC.draw) REC.draw(now);
     updateOverlays();
@@ -1700,7 +1772,7 @@ function snap3D(o, w, h, rowFrac) {        // une vue fixe du nom, à la taille 
   const sv = saveCam(), restore = recSize(w, h), out = document.createElement('canvas'); out.width = w; out.height = h; let rect = null;
   try {
     aimAt(o, rowFrac); const pa = pano.a; if (PANO && pano.ready) setPano(isCk(o) ? 1 : 0); setRig((performance.now() - clock0) / 1000); placeCamera(); rig.updateMatrixWorld(true); camera.updateMatrixWorld();
-    camera.getWorldPosition(seaMat.uniforms.camPos.value); updateLOD(); renderer.render(scene, camera);
+    camera.getWorldPosition(seaMat.uniforms.camPos.value); followSea(); updateLOD(); renderer.render(scene, camera);
     out.getContext('2d').drawImage(canvas, 0, 0, w, h); rect = nameRect(o, w, h); if (PANO && pano.ready) setPano(pa);
   } finally { loadCam(sv); restore(); updateLOD(); }
   return { cv: out, rect };
@@ -1712,7 +1784,7 @@ function snapWide(o, w, h) {                // tout le bateau, de trois quarts, 
     const thW = isCk(o) ? 2.35 : dec(o.slot).f === 0 ? 0.62 : Math.PI - 0.62;
     camOverride = null; ck.on = false; nav.s = nav.ts = 13; nav.th = nav.tth = thW; nav.cy = 14; nav.el = 0.1; nav.d = nav.td = 46 / (tanFov() * Math.min(1, RW / RH / .75));
     setRig((performance.now() - clock0) / 1000); placeCamera(); rig.updateMatrixWorld(true); camera.updateMatrixWorld();
-    camera.getWorldPosition(seaMat.uniforms.camPos.value); updateLOD(); renderer.render(scene, camera);
+    camera.getWorldPosition(seaMat.uniforms.camPos.value); followSea(); updateLOD(); renderer.render(scene, camera);
     const bb = new THREE.Box3().setFromObject(boat); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (let i = 0; i < 8; i++) { _v.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z).project(camera);
       const X = (_v.x + 1) / 2 * RW, Y = (1 - _v.y) / 2 * RH; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y); }
