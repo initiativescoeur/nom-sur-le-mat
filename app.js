@@ -458,9 +458,9 @@ function closeD() { return clamp((stage.clientHeight * PITCH / 30) / (2 * Math.t
 const _m = new THREE.Matrix4(), _t = new THREE.Vector3(), _p = new THREE.Vector3(), _u = new THREE.Vector3();
 const NEAR0 = camera.near;
 function placeCamera() {
-  if (camOverride) { camera.position.copy(camOverride.p); camera.up.copy(camOverride.u); _m.lookAt(camOverride.p, camOverride.t, camOverride.u); camera.quaternion.setFromRotationMatrix(_m); return; }
-  const nr = ck.on && !camOverride ? Math.max(NEAR0, ck.d - 0.15) : NEAR0; if (Math.abs(camera.near - nr) > 1e-4) { camera.near = nr; camera.updateProjectionMatrix(); }
-  if (ck.on) { ckPose(ck.x, ck.y, ck.d, _p, _t); camera.position.copy(_p); camera.up.copy(WUP); _m.lookAt(_p, _t, WUP); camera.quaternion.setFromRotationMatrix(_m); return; }
+  if (camOverride) { setFov(camOverride.f ?? BASE_FOV); camera.position.copy(camOverride.p); camera.up.copy(camOverride.u); _m.lookAt(camOverride.p, camOverride.t, camOverride.u); camera.quaternion.setFromRotationMatrix(_m); return; }
+  if (ck.on) { setFov(ck.fov); camera.position.copy(ckEye); camera.up.copy(WUP); _t.copy(ckEye).add(ckDir(ck.yaw, ck.pitch, _u)); _m.lookAt(ckEye, _t, WUP); camera.quaternion.setFromRotationMatrix(_m); return; }
+  setFov(BASE_FOV);
   const k = THREE.MathUtils.smoothstep(nav.d, 2.5, 14);
   const s = lerp(nav.s, clamp(nav.s, 6, 20), k);
   const dir = XS.clone().multiplyScalar(Math.cos(nav.th)).addScaledVector(CH, Math.sin(nav.th));
@@ -518,16 +518,21 @@ function placeBox(el, rect, pad = 4) {
 // sélection par rayon
 const ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
 
-/* =====================================================================  cockpit : plaque des donateurs sur la cloison avant du cockpit */
+/* =====================================================================  cockpit : deux portraits sur les parois intérieures, les logos sur la cloison avant
+   Les portraits (une seule texture, calculée par cockpit_cells.py) sont posés sur les parois bâbord et tribord, à plat sur le plan
+   de chaque paroi (relevé sur le modèle 3D). On regarde le cockpit à 360° depuis son centre (glisser pour tourner, pincer pour zoomer). */
 const ckCanvas = document.createElement('canvas'), CKTX = 4096;
 ckCanvas.width = CKTX; ckCanvas.height = Math.round(CKTX * CK.h / CK.w);
 const ckTex = new THREE.CanvasTexture(ckCanvas); ckTex.colorSpace = THREE.SRGBColorSpace; ckTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-const ckMesh = new THREE.Mesh(new THREE.PlaneGeometry(CK.w, CK.h), new THREE.MeshBasicMaterial({ map: ckTex, toneMapped: false, color: 0xeeeeee }));
-ckMesh.position.set(CK.cx, CK.cy, CK.z); ckMesh.rotation.y = Math.PI; boat.add(ckMesh);
-const ckFrame = new THREE.Mesh(new THREE.BoxGeometry(CK.w + 0.05, CK.h + 0.05, 0.018), new THREE.MeshStandardMaterial({ color: 0x1b1f26, roughness: 0.5, metalness: 0.2 }));
-ckFrame.position.set(CK.cx, CK.cy, CK.z + 0.012); boat.add(ckFrame);
-const ckLamp = new THREE.PointLight(0xfff1dd, 2.2, 3.2, 1.6); ckLamp.position.set(CK.cx, CK.cy + 0.55, CK.z - 0.9); boat.add(ckLamp);
 const CKR = CK.ref || [4096, Math.round(4096 * CK.h / CK.w)], CKC = CK.cells;
+// plans des parois (x = a + bz·z + cy·y, repère du bateau) ; oeil = point de vue de la vue à 360°
+const CKG = Object.assign({ oeil: [-0.03, 1.85, -5.65], h: 0.76,
+  murs: [{ a: -0.2640, bz: -0.2598, cy: 0.2015, y: 1.46, z: -4.80 }, { a: 0.2039, bz: 0.2598, cy: -0.2014, y: 1.46, z: -4.80 }],
+  cloison: { c: [-0.03, 1.55, -4.32], w: 1.7, h: 0.68 } }, CK.geo || {});
+const ckEye = new THREE.Vector3(...CKG.oeil);
+const ckFrameMat = new THREE.MeshStandardMaterial({ color: 0x1b1f26, roughness: 0.5, metalness: 0.2 });
+const ckLamp = new THREE.PointLight(0xfff1dd, 1.6, 3.4, 1.6); ckLamp.position.set(ckEye.x, 2.05, ckEye.z + 0.2); boat.add(ckLamp);
+const CKS = CKG.h / ((CK.portraits[0] || { area: [0, 0, 1, 1547] }).area[3]);   // mètres par pixel de référence sur les parois
 const ckHeadPx = () => ckCanvas.height * CK.head / CK.h;
 /* --- les places du cockpit sont des cases sur deux portraits d'enfants (data/mat.json « cockpit », calculé par cockpit_cells.py) :
    chaque nom dessine un morceau du visage (graisse et couleur suivent l'image) ; une place libre reste un trait pâle, le portrait
@@ -535,12 +540,34 @@ const ckHeadPx = () => ckCanvas.height * CK.head / CK.h;
 const TYPO_KIDS = CK.portraits.map((p, i) => Object.assign({ num: p.num, area: p.area },
   [{ pal: ['#2b0306', '#b5141e', '#f7e6e4'], acc: '#c10f1c' }, { pal: ['#050d24', '#24529e', '#e3eaf6'], acc: '#1b4aa0' }][i % 2], { bg: '#ffffff' }));
 TYPO_KIDS.forEach(k => { k.img = new Image(); k.img.onload = () => { k.duo = null; try { drawCk(); } catch (e) {} }; k.img.src = `enfants/typo/${k.num}.png`; });
+const ckPanels = TYPO_KIDS.map((kid, s) => {
+  const M = CKG.murs[s], cx = M.a + M.bz * M.z + M.cy * M.y, N = new THREE.Vector3(1, -M.cy, -M.bz).normalize().multiplyScalar(-Math.sign(cx));
+  const U = WUP.clone().addScaledVector(N, -N.y).normalize(), R = N.clone().negate().cross(U).normalize();   // regard = −N, droite = regard × haut
+  const a = kid.area, h = CKG.h, w = h * a[2] / a[3], C = new THREE.Vector3(cx, M.y, M.z).addScaledVector(N, 0.012);
+  const geo = new THREE.PlaneGeometry(w, h), uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (a[0] + uv.getX(i) * a[2]) / CKR[0], 1 - (a[1] + (1 - uv.getY(i)) * a[3]) / CKR[1]);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: ckTex, toneMapped: false, color: 0xeeeeee }));
+  const B4 = new THREE.Matrix4().makeBasis(R, U, N); mesh.matrixAutoUpdate = false; mesh.matrix.copy(B4).setPosition(C); mesh.userData.side = s; boat.add(mesh);
+  const fr = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, h + 0.04, 0.012), ckFrameMat); fr.matrixAutoUpdate = false; fr.matrix.copy(B4).setPosition(C.clone().addScaledVector(N, -0.008)); boat.add(fr);
+  return { s, mesh, C, R, U, N, w, h, a };
+});
+const lgCanvas = document.createElement('canvas'); lgCanvas.width = 2048; lgCanvas.height = Math.round(2048 * CKG.cloison.h / CKG.cloison.w);
+const lgTex = new THREE.CanvasTexture(lgCanvas); lgTex.colorSpace = THREE.SRGBColorSpace; lgTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+const lgMesh = new THREE.Mesh(new THREE.PlaneGeometry(CKG.cloison.w, CKG.cloison.h), new THREE.MeshBasicMaterial({ map: lgTex, toneMapped: false, color: 0xeeeeee }));
+lgMesh.position.set(...CKG.cloison.c); lgMesh.rotation.y = Math.PI; boat.add(lgMesh);
+{ const fr = new THREE.Mesh(new THREE.BoxGeometry(CKG.cloison.w + 0.04, CKG.cloison.h + 0.04, 0.012), ckFrameMat); fr.position.set(CKG.cloison.c[0], CKG.cloison.c[1], CKG.cloison.c[2] + 0.008); boat.add(fr); }
+// pixel de référence (X, Y) d'un portrait → point 3D sur sa paroi
+function ckPt(s, X, Y, out = new THREE.Vector3()) { const P = ckPanels[s]; if (!P) return out.copy(ckEye);
+  return out.copy(P.C).addScaledVector(P.R, ((X - P.a[0]) / P.a[2] - 0.5) * P.w).addScaledVector(P.U, (0.5 - (Y - P.a[1]) / P.a[3]) * P.h).addScaledVector(P.N, 0.002); }
+const ckCellCorners = c => { const q = CKC[c]; return [[q[1], q[2]], [q[3], q[2]], [q[1], q[4]], [q[3], q[4]]].map(([X, Y]) => ckPt(q[0], X, Y)); };
+const ckCellCenter3 = c => { const q = CKC[c]; return ckPt(q[0], (q[1] + q[3]) / 2, (q[2] + q[4]) / 2); };
+function ckKidName(s) { const k = TYPO_KIDS[s], e = k && ENF.enfants.find(x => x.num === k.num); return e ? e.prenom : ''; }
 Promise.all([300, 500, 800].map(w => new FontFace('Barlow Condensed', `url(fonts/barlow-condensed-latin-${w}-normal.woff2)`, { weight: String(w) }).load().then(f => document.fonts.add(f)).catch(() => {})))
   .then(() => { try { drawCk(); } catch (e) {} });
 const hex3 = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const CKSTART = [0, 0]; CKC.forEach((q, i) => { if (q[0] === 1 && !CKSTART[1]) CKSTART[1] = i; });
 const ckNum = c => c - CKSTART[CKC[c][0]] + 1;
-const ckCellH = c => (CKC[c][4] - CKC[c][2]) / CKR[1] * CK.h;
+const ckCellH = c => (CKC[c][4] - CKC[c][2]) * CKS;
 function ckKid(c) { const k = TYPO_KIDS[CKC[c] ? CKC[c][0] : 0], e = k && ENF.enfants.find(x => x.num === k.num); return e ? e.prenom : ''; }
 function ckFace(side) { const a = TYPO_KIDS[side].area; return [a[0] + a[2] / 2, a[1] + a[3] * 0.42]; }
 function ckNeighbors(c) {                       // voisins dans le portrait : même rangée à gauche et à droite, rangées du dessus et du dessous
@@ -593,6 +620,24 @@ function drawPortrait(ctx, kid, side, k) {      // chaque place est une case : l
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = kid.acc; ctx.font = `800 ${cs}px ${STICK_FONT}`; ctx.fillText(label, X + cs * 1.1, Y + cs * 1.55);
   ctx.fillStyle = '#5b6573'; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; ctx.fillText(sub, X + cs * 1.1, Y + cs * 2.25);
 }
+function drawLogos() {                         // cloison avant : bandeau, Mécénat Chirurgie Cardiaque, Initiatives-Cœur, partenaires
+  const ctx = lgCanvas.getContext('2d'), W = lgCanvas.width, H = lgCanvas.height, k = W / 2048, hp = H * 0.17, g = 22 * k;
+  ctx.fillStyle = '#f7f6f2'; ctx.fillRect(0, 0, W, H); drawCkHead(ctx, W, hp);
+  const card = (x, y, cw, ch, title, sub, main) => {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 18 * k); ctx.fill();
+    ctx.setLineDash([16 * k, 10 * k]); ctx.lineWidth = 4 * k; ctx.strokeStyle = main ? 'rgba(206,17,30,.75)' : 'rgba(19,41,75,.32)'; ctx.stroke(); ctx.setLineDash([]);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const ts = Math.min(ch * (main ? 0.16 : 0.24), cw * 0.1);
+    if (main) { ctx.fillStyle = '#ce111e'; heartPath(ctx, x + cw / 2, y + ch * 0.3, ch * 0.24); ctx.fill(); }
+    ctx.fillStyle = main ? '#13294b' : '#3c4a5e'; ctx.font = `800 ${ts}px ${STICK_FONT}`; const tw0 = ctx.measureText(title).width, ts2 = tw0 > cw * 0.88 ? ts * cw * 0.88 / tw0 : ts; ctx.font = `800 ${ts2}px ${STICK_FONT}`; ctx.fillText(title, x + cw / 2, y + ch * (main ? 0.62 : 0.44));
+    ctx.fillStyle = '#8a93a0'; ctx.font = `500 ${ts * 0.58}px ${STICK_FONT}`; ctx.fillText(sub, x + cw / 2, y + ch * (main ? 0.8 : 0.7));
+  };
+  const X = g * 2, Y = hp + g * 1.5, w = W - g * 4, h = H - Y - g * 1.5, mw = w * 0.36;
+  card(X, Y, mw, h, 'Mécénat Chirurgie Cardiaque', 'logo · emplacement prioritaire', true);
+  const x2 = X + mw + g, w2 = w - mw - g, ih = h * 0.3; card(x2, Y, w2, ih, 'Initiatives-Cœur', 'logo', false);
+  const pw = (w2 - g * 2) / 3, ph = (h - ih - g * 2) / 2;
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) card(x2 + c * (pw + g), Y + ih + g + r * (ph + g), pw, ph, 'Partenaire', 'logo', false);
+  lgTex.needsUpdate = true;
+}
 function typoLogos(ctx, X, Y, w, h, k) {
   const card = (x, y, cw, ch, title, sub, main) => {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 18 * k); ctx.fill();
@@ -611,9 +656,8 @@ function typoLogos(ctx, X, Y, w, h, k) {
 let ckSel = -1;
 function drawCk() {
   const ctx = ckCanvas.getContext('2d'), W = ckCanvas.width, H = ckCanvas.height, hp = ckHeadPx(), k = W / CKR[0];
-  ctx.fillStyle = '#f7f6f2'; ctx.fillRect(0, 0, W, H); drawCkHead(ctx, W, hp);
-  TYPO_KIDS.forEach((kid, s) => drawPortrait(ctx, kid, s, k));
-  const pad = 40 * k, midW = 900 * k, pw = (W - midW - pad * 4) / 2; typoLogos(ctx, pad * 2 + pw, hp + pad, midW, H - hp - pad * 2, k);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+  TYPO_KIDS.forEach((kid, s) => drawPortrait(ctx, kid, s, k)); drawLogos();
   if (pickMode && DS.zone === 'ck') {                      // choix d'une place : les cases libres en vert, la place choisie en rouge
     for (let c = 0; c < CKC.length; c++) {
       if (ckOwner[c] >= 0 && c !== ckSel) continue;
@@ -625,27 +669,35 @@ function drawCk() {
   }
   ckTex.needsUpdate = true; dirty = true;
 }
-// position (repère de la plaque, x vers la droite vue depuis l'arrière, y vers le haut) → repère du bateau
-const ckLocal = (u, v) => new THREE.Vector3(CK.cx - (u - 0.5) * CK.w, CK.cy + (0.5 - v) * CK.h, CK.z);   // u, v ∈ [0, 1], v vers le bas
-function ckCellUV(c) { const q = CKC[c]; return { u0: q[1] / CKR[0], u1: q[3] / CKR[0], v0: q[2] / CKR[1], v1: q[4] / CKR[1] }; }
 function ckRect(c) {
-  rig.updateMatrixWorld(); camera.updateMatrixWorld(); const q = ckCellUV(c), r = stage.getBoundingClientRect(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-  for (const [u, v] of [[q.u0, q.v0], [q.u1, q.v0], [q.u0, q.v1], [q.u1, q.v1]]) { _v.copy(ckLocal(u, v)).applyMatrix4(rig.matrixWorld).project(camera); if (_v.z > 1) return null;
+  rig.updateMatrixWorld(); camera.updateMatrixWorld(); const r = stage.getBoundingClientRect(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const P of ckCellCorners(c)) { _v.copy(P).applyMatrix4(rig.matrixWorld).project(camera); if (_v.z > 1) return null;
     const x = (_v.x + 1) / 2 * r.width, y = (1 - _v.y) / 2 * r.height; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   return { x0, y0, x1, y1 };
 }
 function ckPick(cx, cy) {
   const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
   rig.updateMatrixWorld(); camera.updateMatrixWorld(); ray.setFromCamera(_ndc, camera);
-  const hit = ray.intersectObject(ckMesh, false)[0]; if (!hit || !hit.uv) return null;
-  const px = hit.uv.x * CKR[0], py = (1 - hit.uv.y) * CKR[1], c = CKC.findIndex(q => px >= q[1] && px < q[3] && py >= q[2] && py < q[4]);
+  const hit = ray.intersectObjects(ckPanels.map(p => p.mesh), false)[0]; if (!hit || !hit.uv) return null;
+  const s = hit.object.userData.side, px = hit.uv.x * CKR[0], py = (1 - hit.uv.y) * CKR[1], c = CKC.findIndex(q => q[0] === s && px >= q[1] && px < q[3] && py >= q[2] && py < q[4]);
   return c >= 0 ? c : null;
 }
-const ckCellCenter = c => { const q = ckCellUV(c); return { x: ((q.u0 + q.u1) / 2 - 0.5) * CK.w, y: (0.5 - (q.v0 + q.v1) / 2) * CK.h }; };
-// caméra du cockpit : on regarde la plaque depuis l'arrière ; x, y décalage sur la plaque, d distance
-const ck = { on: false, x: 0, y: 0, d: 1.5, tx: 0, ty: 0, td: 1.5 };
-const ckCloseD = () => clamp(isMobile() ? 0.42 : 0.6, 0.3, 1);
-function ckPose(x, y, d, P, T) { T.set(CK.cx - x, CK.cy + y, CK.z); P.set(CK.cx - x * 0.92, CK.cy + y + 0.04 + d * 0.06, CK.z - d); }
+// caméra du cockpit : l'oeil reste au centre du cockpit ; on tourne la tête (cap, site) et on zoome (champ de vision)
+const BASE_FOV = camera.fov, CK_FOV_MIN = 2.5, CK_FOV_MAX = 80;
+const ck = { on: false, yaw: 0, pitch: 0, fov: 40, tyaw: 0, tpitch: 0, tfov: 40 };
+function setFov(f) { if (Math.abs(camera.fov - f) > 1e-4) { camera.fov = f; camera.updateProjectionMatrix(); } }
+const ckDir = (yaw, pitch, out = new THREE.Vector3()) => out.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+function ckLook(P) { const d = P.clone().sub(ckEye); return { yaw: Math.atan2(d.x, d.z), pitch: Math.atan2(d.y, Math.hypot(d.x, d.z)), dist: d.length() }; }
+const ckReadVis = () => isMobile() ? 0.27 : 0.39;      // hauteur de paroi visible pour lire un nom (m)
+function ckViewCell(c, vis = ckReadVis()) { const L = ckLook(ckCellCenter3(c)); return { yaw: L.yaw, pitch: L.pitch, fov: clamp(2 * THREE.MathUtils.radToDeg(Math.atan(vis / 2 / L.dist)), CK_FOV_MIN, CK_FOV_MAX) }; }
+function ckViewPanel(s) {                                      // tout le portrait dans l'écran
+  const P = ckPanels[s] || ckPanels[0], L = ckLook(P.C), a = stage.clientWidth / Math.max(1, stage.clientHeight);
+  const tv = P.h * 1.16 / 2 / L.dist, th = P.w * 1.1 / 2 / L.dist / a;
+  return { yaw: L.yaw, pitch: L.pitch, fov: clamp(2 * THREE.MathUtils.radToDeg(Math.atan(Math.max(tv, th))), 20, CK_FOV_MAX) };
+}
+function ckTurn(v) { let d = v.yaw - ck.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); ck.tyaw = ck.yaw + d; ck.tpitch = v.pitch; ck.tfov = v.fov; dirty = true; }
+function ckSet(v) { ck.yaw = ck.tyaw = v.yaw; ck.pitch = ck.tpitch = v.pitch; ck.fov = ck.tfov = v.fov; }
+const ckSide = () => Math.sin(ck.yaw) >= 0 ? 0 : 1;           // portrait regardé : bâbord (+x) ou tribord
 let camOverride = null;                                        // animation de caméra libre (entrée / sortie du cockpit)
 function mastPose(P, T, U) {                                   // même calcul que placeCamera, sans toucher la caméra
   const k = THREE.MathUtils.smoothstep(nav.td, 2.5, 14), s = lerp(nav.ts, clamp(nav.ts, 6, 20), k);
@@ -661,38 +713,43 @@ function flyPath(pts, ms, my) {      // pts = [{p, t, u}] ; trajectoire Catmull-
       if (my !== token) { camOverride = null; nav.auto = false; return res(false); }
       const e0 = Math.min(1, (now - t0) / ms), e = e0 * e0 * (3 - 2 * e0), f = e * n, i = Math.min(n - 1, Math.floor(f)), u = f - i;
       const P = cr(pts[Math.max(0, i - 1)].p, pts[i].p, pts[i + 1].p, pts[Math.min(n, i + 2)].p, u);
-      const T = pts[i].t.clone().lerp(pts[i + 1].t, u * u * (3 - 2 * u)), U = pts[i].u.clone().lerp(pts[i + 1].u, u).normalize();
-      camOverride = { p: P, t: T, u: U }; dirty = true;
+      const us = u * u * (3 - 2 * u), T = pts[i].t.clone().lerp(pts[i + 1].t, us), U = pts[i].u.clone().lerp(pts[i + 1].u, u).normalize();
+      const f0 = pts[i].f ?? BASE_FOV, f1 = pts[i + 1].f ?? BASE_FOV;
+      camOverride = { p: P, t: T, u: U, f: Math.exp(lerp(Math.log(f0), Math.log(f1), us)) }; dirty = true;
       if (e0 >= 1) { camOverride = null; nav.auto = false; return res(true); } requestAnimationFrame(st);
     })(t0);
   });
 }
 function curPose() { const P = camera.position.clone(), D3 = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  const dist = ck.on ? ck.d : Math.max(1, nav.d); return { p: P, t: P.clone().addScaledVector(D3, dist), u: camera.up.clone() }; }
-async function enterCockpit(x = 0, y = 0, d = 1.5, my = ++token) {
+  return { p: P, t: P.clone().addScaledVector(D3, ck.on ? 1 : Math.max(1, nav.d)), u: camera.up.clone(), f: camera.fov }; }
+const ckArrive = v => [{ p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 2.4, -5), u: WUP.clone(), f: BASE_FOV }, { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.5, -4.4), u: WUP.clone(), f: BASE_FOV },
+  { p: ckEye.clone(), t: ckEye.clone().add(ckDir(v.yaw, v.pitch)), u: WUP.clone(), f: v.fov }];
+async function enterCockpit(v = ckViewPanel(0), my = ++token) {
   stopAuto(); hideTip(); landingSpin = false; spotSlot = -1; $('spot').classList.remove('show');
-  const A = curPose(), out = A.p.clone().add(new THREE.Vector3(A.p.x, 0, A.p.z - B.z).setY(0).normalize().multiplyScalar(ck.on ? 0 : 3)).setY(Math.max(A.p.y, 4));
-  const P3 = new THREE.Vector3(), T3 = new THREE.Vector3(); ckPose(x, y, d, P3, T3);
-  const pts = ck.on ? [A, { p: P3, t: T3, u: WUP.clone() }] : [A, { p: out, t: A.t.clone().lerp(new THREE.Vector3(0, 3, -4), .5), u: WUP.clone() },
-    { p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 2.4, -5), u: WUP.clone() }, { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.45, -4.4), u: WUP.clone() }, { p: P3, t: T3, u: WUP.clone() }];
-  setCkMode(true); ck.x = ck.tx = x; ck.y = ck.ty = y; ck.d = ck.td = d;
-  audioInit(); ambOn(); const ok = await flyPath(pts, ck.on && pts.length === 2 ? 1100 : 4200, my); setTimeout(() => ambOff(), 1200); return ok;
+  if (ck.on && !camOverride) { ckTurn(v); await sleep(reduce ? 0 : 650); return my === token; }   // déjà dans le cockpit : on tourne la tête
+  const A = curPose(), out = A.p.clone().add(new THREE.Vector3(A.p.x, 0, A.p.z - B.z).setY(0).normalize().multiplyScalar(3)).setY(Math.max(A.p.y, 4));
+  const pts = [A, { p: out, t: A.t.clone().lerp(new THREE.Vector3(0, 3, -4), .5), u: WUP.clone(), f: BASE_FOV }, ...ckArrive(v)];
+  setCkMode(true); ckSet(v);
+  audioInit(); ambOn(); const ok = await flyPath(pts, 4200, my); setTimeout(() => ambOff(), 1200); if (ok) ckHint(); return ok;
 }
 async function leaveCockpit(my = ++token) {
   if (!ck.on) return true; hideTip(); spotSlot = -1; $('spot').classList.remove('show');
   const A = curPose(), P = new THREE.Vector3(), T = new THREE.Vector3(), U = new THREE.Vector3(); mastPose(P, T, U);
-  const pts = [A, { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.6, -4), u: WUP.clone() }, { p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 3, -5), u: WUP.clone() }, { p: P, t: T, u: U }];
-  setCkMode(false); const ok = await flyPath(pts, 3600, my); return ok;
+  const pts = [A, { p: ckEye.clone().add(new THREE.Vector3(0, 0.15, -0.6)), t: new THREE.Vector3(0, 1.5, -3.5), u: WUP.clone(), f: Math.min(70, Math.max(A.f, BASE_FOV)) },
+    { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.6, -4), u: WUP.clone(), f: BASE_FOV }, { p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 3, -5), u: WUP.clone(), f: BASE_FOV }, { p: P, t: T, u: U, f: BASE_FOV }];
+  setCkMode(false); const ok = await flyPath(pts, 3800, my); return ok;
 }
+const HINT0 = $('hint').textContent;
+function ckHint() { $('hint').textContent = 'Glisse pour regarder tout autour de toi (360°) · pince ou molette pour zoomer'; hint(true); clearTimeout(hintTimer); hintTimer = setTimeout(() => hint(false), 7000); }
 function setCkMode(on) {
   ck.on = on; app.classList.toggle('in-ck', on); $('ckTxt').textContent = on ? 'Mât' : 'Cockpit';
-  $('alti').style.display = on ? 'none' : ''; $('btnFlip').hidden = on; dirty = true;
+  $('alti').style.display = on ? 'none' : ''; $('btnFlip').hidden = false; if (!on) { $('hint').textContent = HINT0; hint(false); } dirty = true;
 }
 let spotCk = -1;
 async function travelCk(o) {
   const my = ++token; current = o; audioInit(); spotSlot = -1; spotCk = -1; $('spot').classList.remove('show', 'pick'); hideTip();
   setView('travel'); $('climbWho').textContent = o.p + ' ' + o.n; $('alti').classList.remove('armed');
-  const c = ckCellCenter(o.ck); if (!await enterCockpit(c.x, c.y, ckCloseD(), my) || my !== token) return;
+  if (!await enterCockpit(ckViewCell(o.ck), my) || my !== token) return;
   spotCk = o.ck; $('spotTxt').textContent = (o.local ? 'Tu es ici' : o.p + ' est ici') + ' · cockpit'; $('spot').classList.add('show'); dirty = true;
   renderDone(o); setTimeout(() => { if (my === token) setView('done'); }, reduce ? 0 : 500);
   try { history.replaceState(null, '', '#' + o.slug); } catch (e) {}
@@ -710,17 +767,12 @@ function showTipRect(r, html) {
   const tw = tip.offsetWidth, th = tip.offsetHeight; let x = (r.x0 + r.x1) / 2 - tw / 2, y = r.y0 - th - 10; if (y < 50) y = r.y1 + 10;
   tip.style.left = clamp(x, 8, stage.clientWidth - tw - 70) + 'px'; tip.style.top = clamp(y, 50, stage.clientHeight - th - 8) + 'px';
 }
-function selectCk(c) { if (c < 0 || ckOwner[c] >= 0) return; DS.ck = c; ckSel = c; drawCk(); const cc = ckCellCenter(c);
-  if (!ck.on) enterCockpit(cc.x, cc.y, ckCloseD()); else { ck.tx = cc.x; ck.ty = cc.y; ck.td = ckCloseD(); }
+function selectCk(c) { if (c < 0 || ckOwner[c] >= 0) return; DS.ck = c; ckSel = c; drawCk(); const v = ckViewCell(c);
+  if (!ck.on || camOverride) enterCockpit(v); else ckTurn(v);
   spotCk = c; $('spotTxt').textContent = 'Ta place · cockpit'; $('spot').classList.add('show', 'pick'); renderPlace(); }
-// cadrage à l'entrée du cockpit : toute la cloison sur écran large, le premier portrait sur téléphone
-function ckEntry() {
-  const a = stage.clientWidth / Math.max(1, stage.clientHeight), t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  if (a >= 1.1) return { x: 0, d: clamp(CK.w * 0.54 / (t * a), 1.2, 2.6) };
-  const P = TYPO_KIDS[0], u = (P.area[0] + P.area[2] / 2) / CKR[0], wm = P.area[2] / CKR[0] * CK.w;
-  return { x: (u - 0.5) * CK.w, d: clamp(wm * 0.56 / (t * a), 1.2, 2.6) };
-}
-$('btnCk').onclick = async () => { if (ck.on) { spotCk = -1; await leaveCockpit(); } else { spotSlot = -1; const e = ckEntry(); enterCockpit(e.x, 0, e.d); } };
+// à l'entrée du cockpit : le premier portrait en entier
+const ckEntry = () => ckViewPanel(0);
+$('btnCk').onclick = async () => { if (ck.on) { spotCk = -1; await leaveCockpit(); } else { spotSlot = -1; enterCockpit(ckEntry()); } };
 
 function pickAt(cx, cy) {
   const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
@@ -743,8 +795,9 @@ function frame(now) {
     const k = 1 - Math.exp(-dt * 12), kd = 1 - Math.exp(-dt * 6);
     nav.s += (nav.ts - nav.s) * k; nav.th += (nav.tth - nav.th) * k; nav.d *= Math.pow(nav.td / nav.d, kd);
   }
-  if (ck.on && !nav.auto) { const k2 = 1 - Math.exp(-dt * 10); ck.tx = clamp(ck.tx, -CK.w / 2, CK.w / 2); ck.ty = clamp(ck.ty, -CK.h / 2, CK.h / 2); ck.td = clamp(ck.td, 0.25, 2.6);
-    ck.x += (ck.tx - ck.x) * k2; ck.y += (ck.ty - ck.y) * k2; ck.d += (ck.td - ck.d) * k2; if (Math.abs(ck.tx - ck.x) + Math.abs(ck.ty - ck.y) + Math.abs(ck.td - ck.d) > 1e-4) dirty = true; }
+  if (ck.on && !nav.auto) { const k2 = 1 - Math.exp(-dt * 10); ck.tpitch = clamp(ck.tpitch, -1.3, 1.3); ck.tfov = clamp(ck.tfov, CK_FOV_MIN, CK_FOV_MAX);
+    const dy = ck.tyaw - ck.yaw, dp = ck.tpitch - ck.pitch, df = Math.log(ck.tfov / ck.fov); ck.yaw += dy * k2; ck.pitch += dp * k2; ck.fov *= Math.exp(df * k2);
+    if (Math.abs(dy) + Math.abs(dp) + Math.abs(df) > 1e-4) dirty = true; }
   const moving = Math.abs(nav.ts - nav.s) > 1e-4 || Math.abs(nav.tth - nav.th) > 1e-4 || Math.abs(nav.td / nav.d - 1) > 1e-4 || nav.auto;
   const t = (now - clock0) / 1000;
   if (moving || dirty || REC.film || now - lastRender > 45) {
@@ -760,7 +813,7 @@ function frame(now) {
 function updateOverlays() {
   const h = hOf(nav.s); setAlti(h);
   $('faceLbl').textContent = nav.d > 6 ? 'Vue d\'ensemble' : (Math.cos(nav.th) >= 0 ? FACEN[0] : FACEN[1]);
-  $('flipTxt').textContent = Math.cos(nav.th) >= 0 ? FACEN[1] : FACEN[0];
+  $('flipTxt').textContent = ck.on ? ckKidName(1 - ckSide()) : Math.cos(nav.th) >= 0 ? FACEN[1] : FACEN[0];
   if (ck.on || camOverride) $('faceLbl').textContent = ck.on ? 'Cockpit' : $('faceLbl').textContent;
   const sp = $('spot');
   if (spotCk >= 0 && ck.on && !camOverride) placeBox(sp, ckRect(spotCk), 5);
@@ -782,11 +835,11 @@ canvas.addEventListener('pointermove', e => {
   const p = pointers.get(e.pointerId), dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
   if (pointers.size === 2) {
     const [a, b] = [...pointers.values()], dd = Math.hypot(a.x - b.x, a.y - b.y);
-    if (pinch0 > 0) { if (ck.on) ck.td = clamp(ck.td * pinch0 / dd, 0.25, 2.6); else nav.td = clamp(nav.td * pinch0 / dd, D_MIN, D_MAX); } pinch0 = dd; dragging = true; return;
+    if (pinch0 > 0) { if (ck.on) ck.tfov = clamp(ck.tfov * pinch0 / dd, CK_FOV_MIN, CK_FOV_MAX); else nav.td = clamp(nav.td * pinch0 / dd, D_MIN, D_MAX); } pinch0 = dd; dragging = true; return;
   }
   if (!dragging && downInfo && Math.hypot(e.clientX - downInfo.x, e.clientY - downInfo.y) > 6) { dragging = true; canvas.classList.add('dragging'); hint(false); }
   if (!dragging) return;
-  if (ck.on) { const m = 2 * ck.d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / stage.clientHeight; ck.tx -= dx * m; ck.ty += dy * m; return; }
+  if (ck.on) { const m = THREE.MathUtils.degToRad(ck.fov) / stage.clientHeight; ck.tyaw += dx * m; ck.tpitch += dy * m; dirty = true; return; }
   const now = performance.now(), dtm = Math.max(12, now - lastMoveT) / 1000; lastMoveT = now;
   const ds = dy * mpp(), dth = -dx / stage.clientWidth * 2.2;
   nav.ts = clamp(nav.ts + ds, S_MIN, S_MAX); nav.tth = clamp(nav.tth + dth, TH_MIN, TH_MAX);
@@ -807,7 +860,7 @@ canvas.addEventListener('pointerleave', () => { if (!pointers.size) { hoverSlot 
 canvas.addEventListener('wheel', e => {
   e.preventDefault(); stopAuto(); hint(false);
   const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? stage.clientHeight : 1;
-  if (ck.on) { if (e.ctrlKey || e.metaKey || Math.abs(e.deltaX) < 1) ck.td *= Math.exp(e.deltaY * k * 0.0016); else ck.tx += e.deltaX * k * 0.0012; return; }
+  if (ck.on) { if (e.ctrlKey || e.metaKey || Math.abs(e.deltaX) < 1) ck.tfov = clamp(ck.tfov * Math.exp(e.deltaY * k * 0.0016), CK_FOV_MIN, CK_FOV_MAX); else ck.tyaw += e.deltaX * k * THREE.MathUtils.degToRad(ck.fov) / stage.clientWidth; dirty = true; return; }
   if (e.ctrlKey || e.metaKey) { nav.td = clamp(nav.td * Math.exp(e.deltaY * k * 0.004), D_MIN, D_MAX); return; }
   nav.ts = clamp(nav.ts - e.deltaY * k * mpp(), S_MIN, S_MAX);
   nav.tth = clamp(nav.tth + e.deltaX * k / stage.clientWidth * 2, TH_MIN, TH_MAX);
@@ -815,6 +868,9 @@ canvas.addEventListener('wheel', e => {
 addEventListener('keydown', e => {
   if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || !$('dlg').hidden) return;
   const r = PITCH;
+  if (ck.on) { const a = THREE.MathUtils.degToRad(ck.fov) * 0.15;
+    if (e.key === 'ArrowLeft') ck.tyaw += a; else if (e.key === 'ArrowRight') ck.tyaw -= a; else if (e.key === 'ArrowUp') ck.tpitch += a; else if (e.key === 'ArrowDown') ck.tpitch -= a;
+    else if (e.key === '+' || e.key === '=') ck.tfov /= 1.3; else if (e.key === '-') ck.tfov *= 1.3; else return; e.preventDefault(); dirty = true; return; }
   if (e.key === 'ArrowUp') nav.ts += r * 2; else if (e.key === 'ArrowDown') nav.ts -= r * 2;
   else if (e.key === 'PageUp') nav.ts += visH() * .8; else if (e.key === 'PageDown') nav.ts -= visH() * .8;
   else if (e.key === 'ArrowLeft') nav.tth -= .25; else if (e.key === 'ArrowRight') nav.tth += .25;
@@ -823,10 +879,10 @@ addEventListener('keydown', e => {
 });
 let hoverT = 0;
 function hoverAt(x, y) { if (ck.on) return; const now = performance.now(); if (now - hoverT < 40) return; hoverT = now; const sl = pickAt(x, y); if (sl !== hoverSlot) { hoverSlot = sl ?? -1; $('hover').classList.toggle('free', hoverSlot >= 0 && owner[hoverSlot] < 0); dirty = true; } }
-$('btnFlip').onclick = () => { stopAuto(); nav.tth = Math.cos(nav.tth) >= 0 ? Math.PI : 0; if (nav.td > 4) nav.td = D0; };
+$('btnFlip').onclick = () => { if (ck.on) { ckTurn(ckViewPanel(1 - ckSide())); return; } stopAuto(); nav.tth = Math.cos(nav.tth) >= 0 ? Math.PI : 0; if (nav.td > 4) nav.td = D0; };
 $('btnOver').onclick = () => { stopAuto(); if (nav.td > 6) { nav.td = D0; } else { nav.td = 34; nav.tth = 0.55; } };
-$('btnIn').onclick = () => { if (ck.on) ck.td /= 1.5; else nav.td = clamp(nav.td / 1.5, D_MIN, D_MAX); };
-$('btnOut').onclick = () => { if (ck.on) ck.td *= 1.5; else nav.td = clamp(nav.td * 1.5, D_MIN, D_MAX); };
+$('btnIn').onclick = () => { if (ck.on) { ck.tfov /= 1.5; dirty = true; } else nav.td = clamp(nav.td / 1.5, D_MIN, D_MAX); };
+$('btnOut').onclick = () => { if (ck.on) { ck.tfov *= 1.5; dirty = true; } else nav.td = clamp(nav.td * 1.5, D_MIN, D_MAX); };
 let hintTimer = setTimeout(() => hint(false), 9000);
 function hint(on) { $('hint').classList.toggle('gone', !on); }
 
@@ -1591,19 +1647,20 @@ function recSize(w, h) {
 }
 function nameRect(o, w, h) {               // rectangle du nom dans une image w × h, vu par la caméra actuelle
   rig.updateMatrixWorld(); camera.updateMatrixWorld(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-  const pts = isCk(o) ? (q => [[q.u0, q.v0], [q.u1, q.v0], [q.u0, q.v1], [q.u1, q.v1]].map(([u, v]) => ckLocal(u, v)))(ckCellUV(o.ck)) : cellPoly(o.slot, o.perso >= 0).map(x => x.P);
+  const pts = isCk(o) ? ckCellCorners(o.ck) : cellPoly(o.slot, o.perso >= 0).map(x => x.P);
   for (const P of pts) { _v.copy(P).applyMatrix4(rig.matrixWorld).project(camera); if (_v.z > 1) return null;
     const x = (_v.x + 1) / 2 * w, y = (1 - _v.y) / 2 * h; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   return { x0, y0, x1, y1 };
 }
 const tanFov = () => 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-const nameD = (o, rowFrac) => isCk(o) ? clamp(ckCellH(o.ck) / (rowFrac * tanFov()), 0.25, 2.4) : clamp(PITCH / (rowFrac * tanFov()), D_MIN, 3);
-function saveCam() { return { s: nav.s, th: nav.th, d: nav.d, ts: nav.ts, tth: nav.tth, td: nav.td, cy: nav.cy, el: nav.el, ck: ck.on, x: ck.x, y: ck.y, cd: ck.d, tx: ck.tx, ty: ck.ty, ctd: ck.td, ov: camOverride, sp: spotSlot, spw: spotWhole, spc: spotCk }; }
-function loadCam(v) { nav.s = v.s; nav.th = v.th; nav.d = v.d; nav.ts = v.ts; nav.tth = v.tth; nav.td = v.td; nav.cy = v.cy; nav.el = v.el; ck.on = v.ck;
-  ck.x = v.x; ck.y = v.y; ck.d = v.cd; ck.tx = v.tx; ck.ty = v.ty; ck.td = v.ctd; camOverride = v.ov; spotSlot = v.sp; spotWhole = v.spw; spotCk = v.spc; dirty = true; }
+const nameD = (o, rowFrac) => clamp(PITCH / (rowFrac * tanFov()), D_MIN, 3);
+const ckNameView = (o, rowFrac) => ckViewCell(o.ck, ckCellH(o.ck) / rowFrac);
+function saveCam() { return { s: nav.s, th: nav.th, d: nav.d, ts: nav.ts, tth: nav.tth, td: nav.td, cy: nav.cy, el: nav.el, ck: ck.on, cv: { ...ck }, ov: camOverride, sp: spotSlot, spw: spotWhole, spc: spotCk }; }
+function loadCam(v) { nav.s = v.s; nav.th = v.th; nav.d = v.d; nav.ts = v.ts; nav.tth = v.tth; nav.td = v.td; nav.cy = v.cy; nav.el = v.el; Object.assign(ck, v.cv); ck.on = v.ck;
+  camOverride = v.ov; spotSlot = v.sp; spotWhole = v.spw; spotCk = v.spc; dirty = true; }
 function aimAt(o, rowFrac) {               // caméra posée face au nom
   camOverride = null; nav.cy = nav.el = undefined;
-  if (isCk(o)) { const cc = ckCellCenter(o.ck); ck.on = true; ck.x = ck.tx = cc.x; ck.y = ck.ty = cc.y; ck.d = ck.td = nameD(o, rowFrac); }
+  if (isCk(o)) { ck.on = true; ckSet(ckNameView(o, rowFrac)); }
   else { const { f, row } = dec(o.slot); ck.on = false; nav.s = nav.ts = rowS(row); nav.th = nav.tth = f === 0 ? 0 : Math.PI; nav.d = nav.td = nameD(o, rowFrac); }
 }
 function snap3D(o, w, h, rowFrac) {        // une vue fixe du nom, à la taille w × h
@@ -1629,7 +1686,7 @@ function snapWide(o, w, h) {                // tout le bateau, de trois quarts, 
     let cw = (x1 - x0) * 1.04, chh = (y1 - y0) * 1.04; if (cw / chh > w / h) chh = cw * h / w; else cw = chh * w / h;
     cw = Math.min(cw, RW); chh = Math.min(chh, RH); const cx = clamp((x0 + x1) / 2 - cw / 2, 0, RW - cw), cy = clamp((y0 + y1) / 2 - chh / 2 + chh * .03, 0, RH - chh);
     out.getContext('2d').drawImage(canvas, cx, cy, cw, chh, 0, 0, w, h);
-    const P = isCk(o) ? (q => ckLocal((q.u0 + q.u1) / 2, (q.v0 + q.v1) / 2))(ckCellUV(o.ck)) : cellPoly(o.slot, o.perso >= 0).reduce((a, x) => a.add(x.P), new THREE.Vector3()).multiplyScalar(1 / 4);
+    const P = isCk(o) ? ckCellCenter3(o.ck) : cellPoly(o.slot, o.perso >= 0).reduce((a, x) => a.add(x.P), new THREE.Vector3()).multiplyScalar(1 / 4);
     _v.copy(P).applyMatrix4(rig.matrixWorld).project(camera); if (_v.z < 1) pt = { x: ((_v.x + 1) / 2 * RW - cx) * w / cw, y: ((1 - _v.y) / 2 * RH - cy) * h / chh };
   } finally { loadCam(sv); restore(); updateLOD(); }
   return { cv: out, pt };
@@ -1785,9 +1842,9 @@ async function makeFilm(o, me, onFrame) {
     rec.start(200); await sleep(60); while (!F.t0 && my === token) await sleep(30);
     ok = await flyKeys([[0, 12, thW - 0.45, WIDE * 1.15], [3.0, 12, thW, WIDE * 0.92]], my);
     if (ok && isCk(o)) {
-      const cc = ckCellCenter(o.ck), d = nameD(o, 1 / 16), A = curPose(), P3 = new THREE.Vector3(), T3 = new THREE.Vector3(); ckPose(cc.x, cc.y, d, P3, T3);
-      setCkMode(true); ck.x = ck.tx = cc.x; ck.y = ck.ty = cc.y; ck.d = ck.td = d; shot('release', .6);
-      ok = await flyPath([A, { p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 2.4, -5), u: WUP.clone() }, { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.45, -4.4), u: WUP.clone() }, { p: P3, t: T3, u: WUP.clone() }], 5200, my);
+      const v = ckNameView(o, 1 / 16), A = curPose();
+      setCkMode(true); ckSet(v); shot('release', .6);
+      ok = await flyPath([A, ...ckArrive(v)], 5200, my);
       if (ok) shot('clack', 1);
     } else if (ok) {
       const sT = rowS(dec(o.slot).row), dT = nameD(o, 1 / 16); shot('release', .7); ropeOn(); ropeSpeed(4);
@@ -2198,14 +2255,14 @@ function renderPlace() {
   if (DS.zone === 'ck') {
     if (DS.ck >= 0 && ckOwner[DS.ck] >= 0) DS.ck = -1;
     const nbN = DS.ck >= 0 ? ckNeighbors(DS.ck).filter(([, w]) => w.startsWith('à ')).map(([i]) => D[i].p + ' ' + D[i].n) : [];
-    box.innerHTML = DS.ck >= 0 ? `<div class="place"><small>Ta place</small><b>${ckLabel(DS.ck)}</b><span>Ton nom dessine un morceau du portrait de ${esc(ckKid(DS.ck))}, sur la cloison du cockpit, sous les yeux de Violette${nbN.length ? ' · à côté de ' + esc(nbN.join(' et ')) : ''}</span>${stkPickLine(stkCk[DS.ck])}</div>`
+    box.innerHTML = DS.ck >= 0 ? `<div class="place"><small>Ta place</small><b>${ckLabel(DS.ck)}</b><span>Ton nom dessine un morceau du portrait de ${esc(ckKid(DS.ck))}, sur la paroi ${CKC[DS.ck][0] === 0 ? 'bâbord' : 'tribord'} du cockpit, sous les yeux de Violette${nbN.length ? ' · à côté de ' + esc(nbN.join(' et ')) : ''}</span>${stkPickLine(stkCk[DS.ck])}</div>`
       : `<div class="place"><small>Comme dans un avion</small><b>Touche une place libre</b><span>Les places du cockpit dessinent deux portraits d'enfants : chaque nom en est un morceau. Les cases vertes sont libres. Fais glisser pour passer d'un portrait à l'autre, zoome pour lire les noms.</span></div>`;
     q.innerHTML = ''; const frees = [...Array(CK.n).keys()].filter(c => ckOwner[c] < 0);
     const dist = (c, [fx, fy]) => { const q = CKC[c]; return Math.hypot((q[1] + q[3]) / 2 - fx, (q[2] + q[4]) / 2 - fy); };
     TYPO_KIDS.forEach((K, s) => { const e = ENF.enfants.find(x => x.num === K.num), f = ckFace(s), fr = frees.filter(c => CKC[c][0] === s);
       if (fr.length) q.append(chip(`Sur le visage de ${e ? e.prenom : 'l\'enfant'}`, 'blue', () => selectCk(fr.sort((a, b) => dist(a, f) - dist(b, f))[0]))); });
     q.append( chip('Embarquer au plus vite', 'blue', () => selectCk(fastest('ck'))), chip('Au hasard', 'blue', () => selectCk(frees[Math.floor(Math.random() * frees.length)])), chip('Plutôt le mât', 'perso', () => { DS.zone = 'mat'; DS.ck = -1; ckSel = -1; drawCk(); gotoStep(1); }));
-    if (!ck.on) { const e = ckEntry(); enterCockpit(e.x, 0, e.d); }
+    if (!ck.on) enterCockpit(ckEntry());
     $('placeNext').disabled = DS.ck < 0; return;
   }
   if (DS.amt < CFG.prix_choix) {
@@ -2232,7 +2289,7 @@ function drawSticker() {
   const cv = $('sticker'), ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
   ctx.fillStyle = '#fafaf7'; ctx.fillRect(0, 0, W, H);
   const p = $('dPrenom').value.trim() || 'Prénom', n = $('dNom').value.trim() || 'Nom';
-  const sl = DS.slot >= 0 ? DS.slot : nextAuto(), s = rowS(dec(sl).row), inCk = DS.zone === 'ck', cellW = inCk ? (DS.ck >= 0 ? CKC[DS.ck][3] - CKC[DS.ck][1] : CK.cw) / CKR[0] * CK.w : zoneW(s) / 3, rowH = inCk ? (DS.ck >= 0 ? ckCellH(DS.ck) : CK.lh / CKR[1] * CK.h) : PITCH;
+  const sl = DS.slot >= 0 ? DS.slot : nextAuto(), s = rowS(dec(sl).row), inCk = DS.zone === 'ck', cellW = inCk ? (DS.ck >= 0 ? CKC[DS.ck][3] - CKC[DS.ck][1] : CK.cw) * CKS : zoneW(s) / 3, rowH = inCk ? (DS.ck >= 0 ? ckCellH(DS.ck) : CK.lh * CKS) : PITCH;
   const scale = W * 0.8 / cellW, rowPx = Math.min(rowH * scale, H * 0.72);              // échelle : la case occupe 80 % de l'aperçu
   ctx.strokeStyle = '#c9ccd1'; ctx.setLineDash([8, 6]); ctx.lineWidth = 2; ctx.strokeRect(W * .1, H / 2 - rowPx / 2, W * .8, rowPx); ctx.setLineDash([]);
   const fit = fitName(ctx, { p, n }, W * .8 - rowPx * .35, rowPx, false);
@@ -2327,4 +2384,4 @@ addEventListener('hashchange', fromHash);
 requestAnimationFrame(frame);
 setTimeout(() => $('loading').classList.add('done'), 150);
 if (!location.hash) showLanding(); else fromHash();
-window.__dbg = {}; window.__mat = { camera, rig, boat, THREE, nav, D, owner, dec, enc, rowS, travel, tour, startDon, pickAt, screenRect, tiles, renderer, get dirty() { return dirty; }, set dirty(v) { dirty = v; } };
+window.__dbg = {}; window.__mat = { camera, rig, boat, THREE, nav, D, owner, dec, enc, rowS, travel, tour, startDon, pickAt, screenRect, tiles, renderer, ck, ckTurn, ckViewPanel, ckPanels, makeCard, openSocial, get dirty() { return dirty; }, set dirty(v) { dirty = v; } };
