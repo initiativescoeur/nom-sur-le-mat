@@ -109,3 +109,11 @@ puis ouvrir http://localhost:8000.
 - **Démo** : `autocollants_demo.py` complète 9 autocollants et date leurs noms pour montrer des autocollants déjà posés (Lorient, village de Saint-Malo). À relancer après `cockpit_cells.py`. Ajouter `?jour=2027-11-01` à l'adresse pour voir le site à une autre date.
 - **À brancher** : la date de pose réelle de chaque autocollant (saisie par l'équipe au moment de la pose) doit remplacer l'estimation.
 
+## Le vrai cockpit (vue à 360°)
+
+- **La source** : le scan du cockpit d'Ulysse Nizet, « Initiatives-Cœur 4 // Scan Cockpit v2.2 (crop) » (SuperSplat, licence CC BY 4.0), tel que préparé pour le live (`App-Live-Refonte/assets/models/scan-casquette-hd-*.bin`, calage de `bateaux.json`). Le crédit est affiché dans le cockpit, comme la licence le demande (auteur, et mention de la modification).
+- **Ce que voit le visiteur** : dans le cockpit, la vue à 360° est le vrai cockpit, vu du centre : les cœurs, les mots et les portraits peints de Jef Aérosol sous la casquette, les bouts, les winchs, les écrans. Hors du scan (hublots, ouverture arrière), on voit la mer, le ciel et le bateau en 3D.
+- **Les deux portraits remplacés** : les portraits de Jef Aérosol des deux panneaux blancs, à bâbord et à tribord, sont effacés de l'image ; nos portraits faits de noms (Aminata à bâbord, Yacine à tribord) sont posés en 3D sur ces panneaux, au-dessus de la poche, et restent cliquables (choix de la place, fiches). Les portraits du plafond ne changent pas.
+- **Les logos des partenaires** : « Les Chocolats du Cœur » et « K·LINE », dans leur cœur, à leur place exacte sur les deux parois ; redessinés à partir des fichiers vectoriels (`App-Ecrans-RDR-2026/assets/logos/sponsors/`), le tracé du cœur relevé sur le scan.
+- **Fichiers** : `cockpit360/` (six faces de 2048 px en WebP, une version 1024 px pour les téléphones dans `cockpit360/m/`, et `cockpit360.json` : point de vue, faces, panneaux). Fabriqués par `outils-cockpit360/build_pano.py` (rendu des taches gaussiennes du scan, effacement des portraits, logos), à relancer si le scan ou les emplacements changent.
+

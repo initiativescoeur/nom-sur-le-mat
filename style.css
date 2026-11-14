@@ -627,3 +627,4 @@ a.dn:hover { color: var(--ciel); }
 .voylist li.pre { display: block; padding: 0; background: none; cursor: default; border: 0; }
 .voylist li.pre summary { cursor: pointer; padding: 10px 12px; border-radius: 10px; background: var(--houle); font-size: 14px; color: var(--brume); font-weight: 700; }
 .voylist li.pre .voylist { margin-top: 6px; }
+.ckcredit { position: absolute; left: 12px; right: 64px; top: 58px; z-index: 3; font-size: 11px; line-height: 1.3; color: rgba(255,255,255,.85); text-shadow: 0 1px 3px rgba(0,0,0,.7); pointer-events: none; }

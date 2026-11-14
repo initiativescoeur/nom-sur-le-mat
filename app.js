@@ -23,6 +23,7 @@ const fdate = iso => { if (!iso) return ''; const [y, m, d] = iso.split('-').map
 
 const [MAT, DON, PERS, CTP, CFG, GEO, ENF, WORLD, SOI, VOYJ] = await Promise.all(
   ['mat', 'donateurs', 'personnalites', 'contreparties', 'config', 'geo', 'enfants', 'monde', 'soignants', 'voyages'].map(n => getJSON('data/' + n + '.json').catch(e => { if (n === 'soignants') return { soignants: [] }; if (n === 'voyages') return { segments: [] }; throw e; })));
+const PANO = await getJSON('cockpit360/cockpit360.json').catch(() => null);   // le vrai cockpit, scanné (vue à 360°)
 const SOIG = new Map(SOI.soignants.filter(x => x.autorise !== false).map(x => [x.id, x]));
 // les fiches des personnalités peuvent être complétées sans reconstruire le site (data/personnalites.json + dossier personnalites/)
 
@@ -530,7 +531,7 @@ const CKR = CK.ref || [4096, Math.round(4096 * CK.h / CK.w)], CKC = CK.cells;
 const CKG = Object.assign({ oeil: [-0.03, 1.85, -5.65], h: 0.76,
   murs: [{ a: -0.2640, bz: -0.2598, cy: 0.2015, y: 1.46, z: -4.80 }, { a: 0.2039, bz: 0.2598, cy: -0.2014, y: 1.46, z: -4.80 }],
   cloison: { c: [-0.03, 1.55, -4.31], w: 1.7, h: 0.68 } }, CK.geo || {});
-const ckEye = new THREE.Vector3(...CKG.oeil);
+const ckEye = new THREE.Vector3(...(PANO ? PANO.oeil : CKG.oeil));
 const ckLamp = new THREE.PointLight(0xfff1dd, 1.6, 3.4, 1.6); ckLamp.position.set(ckEye.x, 2.05, ckEye.z + 0.2); boat.add(ckLamp);
 const CKS = CKG.h / ((CK.portraits[0] || { area: [0, 0, 1, 1547] }).area[3]);   // mètres par pixel de référence sur les parois
 const ckHeadPx = () => ckCanvas.height * CK.head / CK.h;
@@ -541,19 +542,52 @@ const TYPO_KIDS = CK.portraits.map((p, i) => Object.assign({ num: p.num, area: p
   [{ pal: ['#2b0306', '#b5141e', '#f7e6e4'], acc: '#c10f1c' }, { pal: ['#050d24', '#24529e', '#e3eaf6'], acc: '#1b4aa0' }][i % 2], { bg: '#ffffff' }));
 TYPO_KIDS.forEach(k => { k.img = new Image(); k.img.onload = () => { k.duo = null; try { drawCk(); } catch (e) {} }; k.img.src = `enfants/typo/${k.num}.png`; });
 const ckPanels = TYPO_KIDS.map((kid, s) => {
-  const M = CKG.murs[s], cx = M.a + M.bz * M.z + M.cy * M.y, N = new THREE.Vector3(1, -M.cy, -M.bz).normalize().multiplyScalar(-Math.sign(cx));
-  const U = WUP.clone().addScaledVector(N, -N.y).normalize(), R = N.clone().negate().cross(U).normalize();   // regard = −N, droite = regard × haut
-  const a = kid.area, h = CKG.h, w = h * a[2] / a[3], C = new THREE.Vector3(cx, M.y, M.z).addScaledVector(N, 0.003);
+  const a = kid.area; let C, R, U, N, w, h;
+  if (PANO && PANO.panneaux[s]) {         // le panneau blanc du vrai cockpit : le portrait en haut, au-dessus de la poche
+    const B = PANO.panneaux[s], V3 = v => new THREE.Vector3(...v), TL = V3(B.TL);
+    R = V3(B.R).normalize(); U = V3(B.U).normalize(); N = R.clone().cross(U).normalize(); if (N.dot(V3(B.n)) < 0) N.negate();
+    h = Math.min(0.71 * B.H, 0.94 * B.W * a[3] / a[2]); w = h * a[2] / a[3];
+    C = TL.clone().addScaledVector(R, B.W / 2).addScaledVector(U, -(0.05 * B.H + h / 2)).addScaledVector(N, 0.004);
+  } else {
+    const M = CKG.murs[s], cx = M.a + M.bz * M.z + M.cy * M.y; N = new THREE.Vector3(1, -M.cy, -M.bz).normalize().multiplyScalar(-Math.sign(cx));
+    U = WUP.clone().addScaledVector(N, -N.y).normalize(); R = N.clone().negate().cross(U).normalize();   // regard = −N, droite = regard × haut
+    h = CKG.h; w = h * a[2] / a[3]; C = new THREE.Vector3(cx, M.y, M.z).addScaledVector(N, 0.003);
+  }
   const geo = new THREE.PlaneGeometry(w, h), uv = geo.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, (a[0] + uv.getX(i) * a[2]) / CKR[0], 1 - (a[1] + (1 - uv.getY(i)) * a[3]) / CKR[1]);
-  const mesh = new THREE.Mesh(geo, printMat(ckTex));
+  const mesh = new THREE.Mesh(geo, PANO ? new THREE.MeshBasicMaterial({ map: ckTex, color: 0xe4e4e4, transparent: true, premultipliedAlpha: true, depthTest: false, depthWrite: false, toneMapped: false }) : printMat(ckTex));
+  if (PANO) { mesh.renderOrder = 901; mesh.visible = false; }
   const B4 = new THREE.Matrix4().makeBasis(R, U, N); mesh.matrixAutoUpdate = false; mesh.matrix.copy(B4).setPosition(C); mesh.userData.side = s; boat.add(mesh);
   return { s, mesh, C, R, U, N, w, h, a };
 });
 const lgCanvas = document.createElement('canvas'); lgCanvas.width = 2048; lgCanvas.height = Math.round(2048 * CKG.cloison.h / CKG.cloison.w);
 const lgTex = new THREE.CanvasTexture(lgCanvas); lgTex.colorSpace = THREE.SRGBColorSpace; lgTex.anisotropy = renderer.capabilities.getMaxAnisotropy(); lgTex.premultiplyAlpha = true;
 const lgMesh = new THREE.Mesh(new THREE.PlaneGeometry(CKG.cloison.w, CKG.cloison.h), printMat(lgTex));
-lgMesh.position.set(...CKG.cloison.c); lgMesh.rotation.y = Math.PI; boat.add(lgMesh);
+lgMesh.position.set(...CKG.cloison.c); lgMesh.rotation.y = Math.PI; boat.add(lgMesh); if (PANO) lgMesh.visible = false;   // les vrais logos sont dans la vue à 360°
+// ---------- la vue à 360° du vrai cockpit : six faces autour de l'œil, dessinées par-dessus la scène ; les portraits par-dessus ;
+// puis ce qui, dans le scan, passe devant les panneaux (bouts, poignées). Hors du scan (hublots, ouverture arrière) : la scène 3D.
+const pano = { group: new THREE.Group(), mats: [], ready: false, loading: null, a: 0 };
+pano.group.visible = false; pano.group.position.copy(ckEye); boat.add(pano.group);
+const PANO_HIDE = /^(boat_cap|boat_details|boat_stick)/;      // les pièces du modèle que le scan remplace (comme dans le live)
+function loadPano() {
+  if (!PANO || pano.loading) return pano.loading; const tl = new THREE.TextureLoader(), jobs = [];
+  for (const [face, [rt, up, fw]] of Object.entries(PANO.faces)) for (const avant of [false, true]) {
+    if (avant && !PANO.avant[face]) continue;
+    const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat), F = new THREE.Vector3(...fw);
+    m.matrixAutoUpdate = false; m.matrix.makeBasis(new THREE.Vector3(...rt), new THREE.Vector3(...up), F.clone().negate()).setPosition(F.multiplyScalar(0.5));
+    m.renderOrder = avant ? 902 : 900; m.frustumCulled = false; pano.group.add(m); pano.mats.push(mat);
+    jobs.push(tl.loadAsync(`cockpit360/${isMobile() ? 'm/' : ''}${face}${avant ? '-avant' : ''}.webp`).then(t => { t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.anisotropy = 4; mat.map = t; mat.needsUpdate = true; }));
+  }
+  return pano.loading = Promise.all(jobs).then(() => { pano.ready = true; dirty = true; }).catch(e => console.warn('vue à 360° indisponible', e));
+}
+let panoHidden = [];
+function setPano(a) {                       // a : opacité de la vue à 360° (0 = le modèle seul)
+  if (!PANO) return; pano.a = a; const on = a > 0.001;
+  pano.group.visible = on; pano.mats.forEach(m => m.opacity = a); $('ckCredit').hidden = a < 0.5; ckPanels.forEach(P => { P.mesh.visible = on; P.mesh.material.opacity = a; });
+  if (on && !panoHidden.length && a > 0.98) gltf.scene.traverse(o => { if (o.isMesh && o.visible && (PANO_HIDE.test(o.name) || PANO_HIDE.test(o.parent?.name || ''))) { o.visible = false; panoHidden.push(o); } });
+  if (a <= 0.98 && panoHidden.length) { panoHidden.forEach(o => o.visible = true); panoHidden = []; }
+}
 // pixel de référence (X, Y) d'un portrait → point 3D sur sa paroi
 function ckPt(s, X, Y, out = new THREE.Vector3()) { const P = ckPanels[s]; if (!P) return out.copy(ckEye);
   return out.copy(P.C).addScaledVector(P.R, ((X - P.a[0]) / P.a[2] - 0.5) * P.w).addScaledVector(P.U, (0.5 - (Y - P.a[1]) / P.a[3]) * P.h).addScaledVector(P.N, 0.002); }
@@ -565,7 +599,7 @@ Promise.all([300, 500, 800].map(w => new FontFace('Barlow Condensed', `url(fonts
 const hex3 = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const CKSTART = [0, 0]; CKC.forEach((q, i) => { if (q[0] === 1 && !CKSTART[1]) CKSTART[1] = i; });
 const ckNum = c => c - CKSTART[CKC[c][0]] + 1;
-const ckCellH = c => (CKC[c][4] - CKC[c][2]) * CKS;
+const ckCellH = c => (CKC[c][4] - CKC[c][2]) * (ckPanels[CKC[c][0]] ? ckPanels[CKC[c][0]].h / ckPanels[CKC[c][0]].a[3] : CKS);
 function ckKid(c) { const k = TYPO_KIDS[CKC[c] ? CKC[c][0] : 0], e = k && ENF.enfants.find(x => x.num === k.num); return e ? e.prenom : ''; }
 function ckFace(side) { const a = TYPO_KIDS[side].area; return [a[0] + a[2] / 2, a[1] + a[3] * 0.42]; }
 function ckNeighbors(c) {                       // voisins dans le portrait : même rangée à gauche et à droite, rangées du dessus et du dessous
@@ -685,8 +719,8 @@ const ck = { on: false, yaw: 0, pitch: 0, fov: 40, tyaw: 0, tpitch: 0, tfov: 40 
 function setFov(f) { if (Math.abs(camera.fov - f) > 1e-4) { camera.fov = f; camera.updateProjectionMatrix(); } }
 const ckDir = (yaw, pitch, out = new THREE.Vector3()) => out.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
 function ckLook(P) { const d = P.clone().sub(ckEye); return { yaw: Math.atan2(d.x, d.z), pitch: Math.atan2(d.y, Math.hypot(d.x, d.z)), dist: d.length() }; }
-const ckReadVis = () => isMobile() ? 0.27 : 0.39;      // hauteur de paroi visible pour lire un nom (m)
-function ckViewCell(c, vis = ckReadVis()) { const L = ckLook(ckCellCenter3(c)); return { yaw: L.yaw, pitch: L.pitch, fov: clamp(2 * THREE.MathUtils.radToDeg(Math.atan(vis / 2 / L.dist)), CK_FOV_MIN, CK_FOV_MAX) }; }
+const ckReadVis = (c = 0) => ckCellH(c) * (isMobile() ? 42 : 60);      // hauteur de paroi visible pour lire un nom (m)
+function ckViewCell(c, vis = ckReadVis(c)) { const L = ckLook(ckCellCenter3(c)); return { yaw: L.yaw, pitch: L.pitch, fov: clamp(2 * THREE.MathUtils.radToDeg(Math.atan(vis / 2 / L.dist)), CK_FOV_MIN, CK_FOV_MAX) }; }
 function ckViewPanel(s) {                                      // tout le portrait dans l'écran
   const P = ckPanels[s] || ckPanels[0], L = ckLook(P.C), a = stage.clientWidth / Math.max(1, stage.clientHeight);
   const tv = P.h * 1.16 / 2 / L.dist, th = P.w * 1.1 / 2 / L.dist / a;
@@ -722,6 +756,7 @@ function curPose() { const P = camera.position.clone(), D3 = new THREE.Vector3(0
 const ckArrive = v => [{ p: new THREE.Vector3(0, 6.5, -20), t: new THREE.Vector3(0, 2.4, -5), u: WUP.clone(), f: BASE_FOV }, { p: new THREE.Vector3(0, 1.9, -10.5), t: new THREE.Vector3(0, 1.5, -4.4), u: WUP.clone(), f: BASE_FOV },
   { p: ckEye.clone(), t: ckEye.clone().add(ckDir(v.yaw, v.pitch)), u: WUP.clone(), f: v.fov }];
 async function enterCockpit(v = ckViewPanel(0), my = ++token) {
+  loadPano();
   stopAuto(); hideTip(); landingSpin = false; spotSlot = -1; $('spot').classList.remove('show');
   if (ck.on && !camOverride) { ckTurn(v); await sleep(reduce ? 0 : 650); return my === token; }   // déjà dans le cockpit : on tourne la tête
   const A = curPose(), out = A.p.clone().add(new THREE.Vector3(A.p.x, 0, A.p.z - B.z).setY(0).normalize().multiplyScalar(3)).setY(Math.max(A.p.y, 4));
@@ -768,7 +803,7 @@ function selectCk(c) { if (c < 0 || ckOwner[c] >= 0) return; DS.ck = c; ckSel = 
   if (!ck.on || camOverride) enterCockpit(v); else ckTurn(v);
   spotCk = c; $('spotTxt').textContent = 'Ta place · cockpit'; $('spot').classList.add('show', 'pick'); renderPlace(); }
 // à l'entrée du cockpit : le premier portrait en entier
-const ckEntry = () => ckViewPanel(0);
+const ckEntry = () => { const v = ckViewPanel(0); if (PANO) v.fov = clamp(v.fov * 2.4, 40, 66); return v; };
 $('btnCk').onclick = async () => { if (ck.on) { spotCk = -1; await leaveCockpit(); } else { spotSlot = -1; enterCockpit(ckEntry()); } };
 
 function pickAt(cx, cy) {
@@ -792,6 +827,7 @@ function frame(now) {
     const k = 1 - Math.exp(-dt * 12), kd = 1 - Math.exp(-dt * 6);
     nav.s += (nav.ts - nav.s) * k; nav.th += (nav.tth - nav.th) * k; nav.d *= Math.pow(nav.td / nav.d, kd);
   }
+  if (PANO) { const want = ck.on && pano.ready && camera.position.distanceTo(ckEye) < 0.06 ? 1 : 0; if (Math.abs(want - pano.a) > 0.001) { setPano(want ? Math.min(1, pano.a + dt * 2.2) : Math.max(0, pano.a - dt * 4)); dirty = true; } }
   if (ck.on && !nav.auto) { const k2 = 1 - Math.exp(-dt * 10); ck.tpitch = clamp(ck.tpitch, -1.3, 1.3); ck.tfov = clamp(ck.tfov, CK_FOV_MIN, CK_FOV_MAX);
     const dy = ck.tyaw - ck.yaw, dp = ck.tpitch - ck.pitch, df = Math.log(ck.tfov / ck.fov); ck.yaw += dy * k2; ck.pitch += dp * k2; ck.fov *= Math.exp(df * k2);
     if (Math.abs(dy) + Math.abs(dp) + Math.abs(df) > 1e-4) dirty = true; }
@@ -1663,9 +1699,9 @@ function aimAt(o, rowFrac) {               // caméra posée face au nom
 function snap3D(o, w, h, rowFrac) {        // une vue fixe du nom, à la taille w × h
   const sv = saveCam(), restore = recSize(w, h), out = document.createElement('canvas'); out.width = w; out.height = h; let rect = null;
   try {
-    aimAt(o, rowFrac); setRig((performance.now() - clock0) / 1000); placeCamera(); rig.updateMatrixWorld(true); camera.updateMatrixWorld();
+    aimAt(o, rowFrac); const pa = pano.a; if (PANO && pano.ready) setPano(isCk(o) ? 1 : 0); setRig((performance.now() - clock0) / 1000); placeCamera(); rig.updateMatrixWorld(true); camera.updateMatrixWorld();
     camera.getWorldPosition(seaMat.uniforms.camPos.value); updateLOD(); renderer.render(scene, camera);
-    out.getContext('2d').drawImage(canvas, 0, 0, w, h); rect = nameRect(o, w, h);
+    out.getContext('2d').drawImage(canvas, 0, 0, w, h); rect = nameRect(o, w, h); if (PANO && pano.ready) setPano(pa);
   } finally { loadCam(sv); restore(); updateLOD(); }
   return { cv: out, rect };
 }
@@ -2381,4 +2417,4 @@ addEventListener('hashchange', fromHash);
 requestAnimationFrame(frame);
 setTimeout(() => $('loading').classList.add('done'), 150);
 if (!location.hash) showLanding(); else fromHash();
-window.__dbg = {}; window.__mat = { camera, rig, boat, THREE, nav, D, owner, dec, enc, rowS, travel, tour, startDon, pickAt, screenRect, tiles, renderer, ck, ckTurn, ckViewPanel, ckPanels, makeCard, openSocial, get dirty() { return dirty; }, set dirty(v) { dirty = v; } };
+window.__dbg = {}; window.__mat = { camera, rig, boat, THREE, nav, D, owner, dec, enc, rowS, travel, tour, startDon, pickAt, screenRect, tiles, renderer, ck, ckTurn, ckViewPanel, ckPanels, makeCard, openSocial, pano, ckEye, get dirty() { return dirty; }, set dirty(v) { dirty = v; } };
