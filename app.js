@@ -984,7 +984,7 @@ addEventListener('keydown', e => {
 });
 let hoverT = 0;
 function hoverAt(x, y) { if (ck.on) return; const now = performance.now(); if (now - hoverT < 40) return; hoverT = now; const sl = pickAt(x, y); if (sl !== hoverSlot) { hoverSlot = sl ?? -1; $('hover').classList.toggle('free', hoverSlot >= 0 && owner[hoverSlot] < 0); dirty = true; } }
-$('btnFlip').onclick = () => { if (ck.on) { ckTurn(ckViewPanel(1 - ckSide())); return; } stopAuto(); nav.tth = Math.cos(nav.tth) >= 0 ? Math.PI : 0; if (nav.td > 4) nav.td = D0; };
+$('btnFlip').onclick = () => { if (ck.on) { ckTurn(ckViewPanel(1 - ckSide())); return; } stopAuto(); const f = Math.cos(nav.tth) >= 0 ? 1 : 0; nav.tth = f ? Math.PI : 0; if (nav.td > 4) nav.td = D0; nav.ts = namedS(f, nav.ts, 0.35); };
 $('btnOver').onclick = () => { stopAuto(); if (nav.td > 6) { nav.td = D0; } else { nav.td = 34; nav.tth = 0.55; } };
 $('btnIn').onclick = () => { if (ck.on) { ck.tfov /= 1.5; dirty = true; } else nav.td = clamp(nav.td / 1.5, D_MIN, D_MAX); };
 $('btnOut').onclick = () => { if (ck.on) { ck.tfov *= 1.5; dirty = true; } else nav.td = clamp(nav.td * 1.5, D_MIN, D_MAX); };
@@ -1031,6 +1031,18 @@ $('sound').onclick = () => { SND.on = !SND.on; $('sound').setAttribute('aria-pre
 
 /* =====================================================================  montée vers une place */
 let token = 0, current = null;
+// une hauteur où l'on voit une série de noms sur la face f (et pas le pied du mât ni une zone vide), la plus proche de sNear
+function namedS(f, sNear, keep = 0) {
+  const half = Math.tan(THREE.MathUtils.degToRad(BASE_FOV / 2)) * D0 * 0.7, n = new Float32Array(NR + 1), sr = new Float32Array(NR + 1);
+  for (let r = 1; r <= NR; r++) { sr[r] = rowS(r); for (let c = 0; c < NC; c++) if (owner[enc(f, r, c)] >= 0) n[r]++; }
+  const dens = s0 => { let a = 0, t = 0; for (let r = 1; r <= NR; r++) if (Math.abs(sr[r] - s0) <= half) { a += n[r]; t += NC; } return t ? a / (Math.max(t, 2 * half / PITCH * NC)) : 0; };
+  const S_LO = 2.4, cand = []; let best = 0;
+  for (let r = 1; r <= NR; r += 2) if (sr[r] >= S_LO) { const d = dens(sr[r]); cand.push([sr[r], d]); if (d > best) best = d; }
+  if (!best) return sNear;
+  if (keep && sNear >= S_LO && dens(sNear) >= keep * best) return sNear;
+  let out = sNear, gap = Infinity; for (const [sc, d] of cand) if (d >= 0.75 * best && Math.abs(sc - sNear) < gap) { gap = Math.abs(sc - sNear); out = sc; }
+  return out;
+}
 function stopAuto() { if (nav.auto) { nav.auto = false; token++; ropeOff(); nav.ts = nav.s; nav.tth = nav.th; nav.td = nav.d; } }
 async function glideTo(sTarget, thTarget, dTarget, my, opts = {}) {
   await decodeAll(); if (my !== token) return false;
@@ -1105,17 +1117,21 @@ async function flyKeys(K, my) {           // K = [[t (s), s, th, d], …] ; d in
 async function survol() {
   stopAuto(); const my = ++token; audioInit(); hideTip(); ambOn();
   const o = current, hadSpot = spotSlot; $('spot').classList.remove('show'); $('btnSurvol').classList.add('on');
-  let back = { s: nav.s, th: nav.th, d: nav.d };
+  // fin du vol : sur le nom recherché ; sinon dans le cockpit si on en partait ; sinon face bâbord ou tribord, devant une série de noms
+  let back = null; const ckBack = o && isCk(o) ? 'nom' : (!o && ck.on ? { yaw: ck.yaw, pitch: ck.pitch, fov: ck.fov } : null);
   if (ck.on) { spotCk = -1; if (!await leaveCockpit(my)) { $('btnSurvol').classList.remove('on'); return; } }
   if (o && !isCk(o)) { const { f, row } = dec(o.slot); back = { s: rowS(row), th: f === 0 ? 0 : Math.PI, d: closeD() }; }
-  const th0 = nav.th, TAU = Math.PI * 2, thE = back.th + TAU * Math.round((th0 + TAU - back.th) / TAU);
+  else if (!ckBack) { const f = Math.cos(nav.th) >= 0 ? 0 : 1; back = { s: namedS(f, nav.s), th: f ? Math.PI : 0, d: D0 }; }
+  const th0 = nav.th, TAU = Math.PI * 2, thE = back ? back.th + TAU * Math.round((th0 + TAU - back.th) / TAU) : th0 + 4.8;
   const K = [[0, nav.s, th0, nav.d], [2.6, clamp(nav.s, 4, 20), th0 + 0.35, 13], [6.2, 15, th0 + 1.5, 32], [10.2, 16, th0 + 3.3, 36],
-    [13.8, 13, thE - 1.5, 24], [17.2, back.s, thE - 0.25, 5], [19.6, back.s, thE, back.d]];
+    [13.8, 13, thE - 1.5, 24], ...(back ? [[17.2, back.s, thE - 0.25, 5], [19.6, back.s, thE, back.d]] : [])];
   await flyKeys(K, my);
   $('btnSurvol').classList.remove('on'); setTimeout(() => { if (my === token) ambOff(); }, 1500);
   if (my !== token) return;
+  if (ckBack === 'nom') { travelCk(o); return; }
+  if (ckBack) { enterCockpit(ckBack, my);              // en sortant du cockpit ensuite, on retrouvera une face pleine de noms
+    const f = Math.cos(nav.th) >= 0 ? 0 : 1; nav.s = nav.ts = namedS(f, 6); nav.th = nav.tth = f ? Math.PI : 0; nav.d = nav.td = D0; return; }
   nav.s = nav.ts = back.s; nav.th = nav.tth = back.th; nav.d = nav.td = back.d;
-  if (o && isCk(o)) { travelCk(o); return; }
   if (o && hadSpot >= 0) { spotSlot = hadSpot; $('spot').classList.add('show'); } dirty = true;
 }
 $('btnSurvol').onclick = () => { if ($('btnSurvol').classList.contains('on')) { stopAuto(); $('btnSurvol').classList.remove('on'); } else survol(); };
@@ -2351,7 +2367,8 @@ function renderAmounts() {
   $('tier').innerHTML = `<b>Palier <em>${esc(P.nom)}</em></b><span>${esc(P.accroche)}</span><ul>${P.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul><button class="chip blue" type="button" id="seeTiers">Tous les paliers et le tirage au sort</button>`;
   $('seeTiers').onclick = openTiers;
   const k = ENF.enfants.find(e => e.finance < 1) || ENF.enfants[ENF.enfants.length - 1];
-  $('impact').innerHTML = `${nf(ENF.cout)} € permettent de sauver un enfant. Ton don de <strong>${DS.amt} €</strong> rejoint ceux qui financent l'opération de <strong>${esc(k.prenom)}, ${ageTxt(k)} (${esc(k.pays)})</strong>, déjà financée à ${Math.round(k.finance * 100)} %.`;
+  $('impact').innerHTML = `${nf(ENF.cout)} € permettent de sauver un enfant. Ton don de <strong>${DS.amt} €</strong> rejoint ceux qui financent l'opération de <strong><a class="dn" href="#" id="impactKid" title="Voir la fiche de ${esc(k.prenom)}">${esc(k.prenom)}, ${ageTxt(k)}</a> (${esc(k.pays)})</strong>, déjà financée à ${Math.round(k.finance * 100)} %.`;
+  $('impactKid').onclick = e => { e.preventDefault(); openKid(k); };
 }
 $('amtOther').addEventListener('input', e => { const v = parseInt(e.target.value.replace(/\D/g, ''), 10); if (v >= (DS.zone === 'ck' ? PCK() : CFG.prix_auto)) { DS.amt = v; renderAmounts(); $('amtOther').value = v; } });
 function setPick(on) { if (pickMode === on) { drawCk(); return; } pickMode = on; stage.classList.toggle('picking', on); $('pickbar').hidden = !on; redrawAll(); drawCk(); }

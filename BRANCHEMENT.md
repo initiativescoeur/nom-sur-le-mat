@@ -124,3 +124,9 @@ puis ouvrir http://localhost:8000.
 - **La mer** : refaite pour ce site, libre de droits. Huit trains de houle (vagues de Gerstner) sur une grille qui suit la caméra jusqu'à l'horizon, reflets du ciel avec l'effet Fresnel, reflet du soleil, écume sur les crêtes et sillage blanc derrière le bateau, brume d'horizon. Hauteur des vagues réglable dans `data/config.json` → `mer_amplitude` (1,15 par défaut ; 0,6 pour une mer calme).
 - **Les ombres** : le soleil projette l'ombre des voiles et du gréement sur le pont, sur ordinateur seulement (désactivées sur téléphone pour garder la fluidité).
 - **Pourquoi pas Three.js Water Pro** : la mer du live utilise Water Pro, sous licence commerciale ; elle ne peut pas aller dans un dépôt public comme celui-ci. La mer de ce site s'en approche sans en reprendre le code.
+
+## Navigation autour du mât
+
+- **Bâbord / Tribord** : le bouton passe de l'autre côté du mât ; si l'on était au pied du mât ou devant une zone vide, la vue remonte jusqu'à la série de noms la plus proche.
+- **Survol** : le vol se termine sur le nom recherché ; sans nom recherché, sur la face bâbord ou tribord, devant une série de noms (jamais sur la tranche du mât) ; lancé depuis le cockpit, il ramène dans le cockpit.
+- **Étape du don** : le prénom de l'enfant (« l'opération de Yacine, 12 ans ») ouvre sa fiche.
