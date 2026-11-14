@@ -104,14 +104,27 @@ def board_geom(b, Fc):
     inside = ok & (s_ > -0.01) & (s_ < 1.01) & (t_ > -0.01) & (t_ < 1.01); on = inside & (np.abs(Fc['Zs'] - tpl) < 0.018); front = inside & (Fc['Zs'] < tpl - 0.018)
     reg = on & (s_ > 0.012) & (s_ < 0.988) & (t_ > 0.04) & (t_ < 0.78)
     ring = on & ~reg & (Fc['col'].mean(2) > 0.62) & (t_ < 0.9) & ~((t_ < 0.06) & ((s_ < 0.1) | (s_ > 0.9)))
-    return s_, t_, on, front, reg, ring
-for b in BOARDS:                                   # 2. panneaux : un seul fond pour tout le panneau, quelles que soient les faces
-    G = {k: board_geom(b, Fc) for k, Fc in F.items()}
-    xs = np.concatenate([g[0][g[5]] for g in G.values()]); ys = np.concatenate([g[1][g[5]] for g in G.values()]); cs = np.concatenate([F[k]['col'][g[5]] for k, g in G.items()])
-    coef = qcoef(xs, ys, cs); rng = np.random.default_rng(1)
-    for k, (s_, t_, on, front, reg, ring) in G.items():
-        Fc = F[k]
-        if reg.any(): Fc['col'][reg] = np.clip(QA(s_[reg], t_[reg]) @ coef + rng.normal(0, 0.005, (reg.sum(), 3)), 0, 1)
+    return s_, t_, on, front, reg, ring, inside
+for b in BOARDS:                                   # 2. panneaux : on n'efface que la peinture ; le panneau garde sa vraie matière, sa teinte et ses bords
+    G = {k: board_geom(b, Fc) for k, Fc in F.items()}; rng = np.random.default_rng(1)
+    core = {k: g[6] & ~g[3] & (g[0] > 0.035) & (g[0] < 0.965) & (g[1] > 0.055) & (g[1] < 0.79) for k, g in G.items()}
+    lum = {k: F[k]['col'].mean(2) for k in G}; sat = {k: F[k]['col'].max(2) - F[k]['col'].min(2) for k in G}
+    allL = np.concatenate([lum[k][core[k]] for k in G]);
+    if not len(allL): continue
+    thr0 = np.percentile(allL, 70) - 0.12
+    cand = {k: core[k] & (lum[k] > thr0) & (sat[k] < 0.10) for k in G}
+    coef = qcoef(np.concatenate([G[k][0][cand[k]] for k in G]), np.concatenate([G[k][1][cand[k]] for k in G]), np.concatenate([F[k]['col'][cand[k]] for k in G]))
+    sd = float(np.std(np.concatenate([F[k]['col'][cand[k]].mean(1) for k in G]))) if any(cand[k].any() for k in G) else 0.01
+    for k, (s_, t_, on, front, reg, ring, ins) in G.items():
+        Fc = F[k]; c = core[k]
+        if c.any():
+            fit = np.zeros_like(Fc['col']); fit[c] = QA(s_[c], t_[c]) @ coef
+            paint = c & ((lum[k] < fit.mean(2) - 0.09) | (sat[k] > 0.11) | (np.abs(Fc['col'] - fit).sum(2) > 0.27))
+            m = cv2.dilate(paint.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(np.float32)
+            soft = cv2.GaussianBlur(cv2.erode(c.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(np.float32), (0, 0), 2)
+            m = np.clip(cv2.GaussianBlur(m, (0, 0), 3) * 1.6, 0, 1) * soft
+            fill = np.clip(fit + rng.normal(0, min(0.02, max(0.006, sd * 0.5)), fit.shape), 0, 1)
+            Fc['col'] = (Fc['col'] * (1 - m[..., None]) + fill * m[..., None]).astype(np.float32)
         Fc['fg'][front, :3] = Fc['col'][front]; Fc['fg'][front, 3] = 1
 for Lg in LOGOS:                                   # 3. logos : fond ajusté dans le plan de la paroi, puis les logos en haute définition
     Hc, Wc = Lg['mask'].shape; G = {}

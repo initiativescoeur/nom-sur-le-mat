@@ -49,23 +49,24 @@
     <div class="v-landing">
       <div class="intro">
         <div class="eyebrow">Initiatives-Cœur <span class="x">×</span> Mécénat Chirurgie Cardiaque</div>
-        <figure class="lphoto" id="lPhoto" hidden><img src="photos/violette.jpg" alt="Violette Dorange à bord d'Initiatives-Cœur" onload="this.parentNode.hidden=false" onerror="this.parentNode.remove()"><figcaption>Violette Dorange<small>© Vincent Curutchet / Initiatives-Cœur</small></figcaption></figure>
+        <figure class="lphoto" id="lPhoto" hidden><img src="photos/violette.jpg" alt="Violette Dorange à bord d'Initiatives-Cœur" onload="this.parentNode.hidden=false" onerror="this.parentNode.remove()"><figcaption>Violette Dorange</figcaption></figure>
         <h1 class="lh1">Ton nom <em>autour du monde</em></h1>
         <p class="lsub">sur le bateau de Violette Dorange</p>
         <p class="invite" id="lInvite" hidden></p>
-        <p class="lead">Dès <strong>10 €</strong>, ton prénom et ton nom embarquent sur l'IMOCA Initiatives-Cœur, sur le mât ou dans le cockpit, pour toutes ses courses jusqu'au Vendée Globe 2028. Et ton don aide à faire opérer du cœur un enfant venu de loin.</p>
+        <p class="lead">Dès <strong>10 €</strong>, ton prénom et ton nom embarquent pour un an sur l'IMOCA Initiatives-Cœur, sur le mât ou dans le cockpit, pendant ses courses et ses traversées. Pour poursuivre l'aventure jusqu'au Vendée Globe 2028, il suffit de participer à nouveau. Et ton don aide à faire opérer du cœur un enfant venu de loin.</p>
       </div>
       <div class="lstats" id="lStats"></div>
       <div class="choices">
         <button class="choice main" id="lDon" type="button"><b>Je mets mon nom sur le bateau</b><span>et j'aide à sauver un enfant · dès 10 €, sur le mât ou dans le cockpit</span><i>→</i></button>
         <button class="choice" id="lExplore" type="button"><b>Je découvre l'équipage du mât</b><span id="lExploreTxt">les noms déjà à bord, les enfants qu'ils aident, la carte du monde</span><i>→</i></button>
       </div>
+      <button class="lmine" id="lMine" type="button" hidden></button>
       <div class="lrow"><button class="lfind" id="lFind" type="button">Mon nom est déjà à bord : le retrouver</button><button class="lfind" id="lShare" type="button">Partager à mes proches</button></div>
       <div class="tirage"><svg viewBox="0 0 24 24"><path d="M3 18h18M5 18l2-9 5 4 5-4 2 9"/><circle cx="12" cy="6" r="2"/></svg>
         <div><b>Grand tirage au sort parmi tous les donateurs</b><span>5 d'entre eux partiront naviguer avec Violette à bord d'Initiatives-Cœur.</span><button class="lk" id="lTiers" type="button">Contreparties et règlement</button></div></div>
       <ol class="how">
         <li><b>Je donne</b><span>dès 10 €, en ligne, avec reçu fiscal</span></li>
-        <li><b>Mon nom embarque</b><span>sur le mât ou dans le cockpit, à la place que je choisis</span></li>
+        <li><b>Mon nom embarque</b><span>pour un an, sur le mât ou dans le cockpit, à la place que je choisis</span></li>
         <li><b>Je suis l'enfant que j'aide</b><span>sa fiche, son voyage, son opération</span></li>
         <li><b>Je le vois en course</b><span>pendant les courses, mon nom peut apparaître dans les vidéos de Violette</span></li>
       </ol>
@@ -99,6 +100,7 @@
     <div class="thanks v-done" id="thanks">
       <h2 class="merci"><b id="tMerci">Merci </b><span id="tName"></span></h2>
       <div class="where" id="tWhere"></div>
+      <div class="mine" id="tMine" hidden></div>
       <div id="tVoy" hidden></div>
       <p class="chain" id="tChain" hidden></p>
       <div class="socpush" id="tSoc"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1"/></svg><span><b>Montre-le à tes proches</b>Une image et une vidéo de ton nom sur le bateau, prêtes pour Instagram et Facebook.</span><button class="btn red small" id="social2" type="button">Créer mes visuels</button></div>
@@ -154,9 +156,10 @@
         <details class="more"><summary>Ma fiche publique (facultatif)</summary>
           <label>Quelques mots sur toi<textarea id="dBio" rows="2" maxlength="140" placeholder="Ex. : Prof de SVT, ma classe suit le bateau"></textarea></label>
           <label>Une photo<input type="file" id="dPhoto" accept="image/*"></label>
-          <img id="dPhotoPrev" class="photoprev" alt="" hidden>
+          <img id="dPhotoPrev" class="photoprev" alt="" hidden><p class="fine warn" id="dPhotoMsg" hidden>Cette photo n'a pas pu être lue (format HEIC ?). Choisis une photo JPEG ou PNG.</p>
           <label class="check"><input type="checkbox" id="dPub" checked> Afficher ma photo et ces quelques mots sur ma fiche</label>
         </details>
+        <label class="check"><input type="checkbox" id="dNews"> Je veux recevoir par e-mail des nouvelles de l'enfant que j'aide à sauver : son arrivée en France, son opération, son retour chez lui.</label>
         <label class="check"><input type="checkbox" id="dOk"> J'accepte que mon prénom, mon nom, ma ville et mon message apparaissent sur le mât et sur ce site.</label>
         <button class="go" type="button" data-next id="infoNext">Continuer</button>
       </div>

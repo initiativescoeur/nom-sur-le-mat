@@ -52,6 +52,10 @@ function occupy(o) {
   else if (o.slot >= 0) owner[o.slot] = o.i;
 }
 D.forEach(occupy);
+// démo : photos fictives de donateurs (data/config.json → photos_demo : dossier, fichiers, part des fiches qui en reçoivent une)
+{ const PD = CFG.photos_demo || {}, F = PD.fichiers || [];
+  if (F.length) D.forEach(o => { if (o.ph || o.perso >= 0) return; const h = (Math.imul(o.i + 1, 2654435761) >>> 0) / 4294967296;
+    if (h < (PD.part ?? 0.4)) { o.ph = (PD.dossier || 'donateurs/photos/') + F[Math.floor(h / (PD.part ?? 0.4) * F.length) % F.length]; o.phDemo = true; } }); }
 const LOCAL_KEY = 'nom-sur-le-mat-dons';
 try { (JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]')).forEach(o => { if (o.ck >= 0 ? ckOwner[o.ck] < 0 : owner[o.slot] < 0) { o.i = D.length; o.local = true; D.push(o); occupy(o); } }); } catch (e) {}
 
@@ -412,7 +416,7 @@ function fitName(ctx, o, maxW, rowPx, bold) {
 // places libres : en attendant un nom, on les habille (cœurs pâles, portraits d'enfants, petites phrases) pour que le mât ne paraisse pas vide
 function FILL_TXT() { return FILL_TXT.v || (FILL_TXT.v = ['Bon vent Violette !', 'Chaque don compte', 'Un cœur, un enfant', 'Tous dans le même bateau', "Cap sur l'espoir", "Merci d'être à bord", 'Pour les enfants du monde', 'Ton nom ici ?', 'Ensemble, plus loin', 'Le cœur au large']); }
 function KIDIMG() {
-  if (!KIDIMG.v) KIDIMG.v = ENF.enfants.filter(k => k.photo).map(k => { const im = new Image(); im.onload = () => { clearTimeout(KIDIMG.t); KIDIMG.t = setTimeout(() => { try { redrawAll(); drawCk(); } catch (e) {} }, 400); }; im.src = k.photo; return im; });
+  if (!KIDIMG.v) KIDIMG.v = ENF.enfants.filter(k => k.photo).map(k => { const im = new Image(); im.kid = k; im.onload = () => { clearTimeout(KIDIMG.t); KIDIMG.t = setTimeout(() => { try { redrawAll(); drawCk(); } catch (e) {} }, 400); }; im.src = k.photo; return im; });
   return KIDIMG.v;
 }
 function fhash(n) { let x = Math.imul(n + 0x9e37, 2654435761) >>> 0; x ^= x >>> 13; x = Math.imul(x, 0x5bd1e995) >>> 0; return (x ^ (x >>> 15)) >>> 0; }
@@ -422,7 +426,7 @@ function drawFiller(ctx, key, x0, x1, yc, rowPx, hi) {
   const KI = KIDIMG();
   if (k >= 44 && k < 64 && KI.length) {
     const im = KI[(h >>> 8) % KI.length];
-    if (im.complete && im.naturalWidth) { const r = rowPx * .4, S = im.naturalWidth * .62, sx = im.naturalWidth * .5 - S / 2, sy = im.naturalHeight * .44 - S / 2;
+    if (im.complete && im.naturalWidth) { const r = rowPx * .4, W = im.naturalWidth, H = im.naturalHeight, c = kCad(im.kid), S = Math.min(W, H, c.t * W / .6), sx = clamp(c.x * W - S / 2, 0, W - S), sy = clamp(c.y * H - S / 2, 0, H - S);
       ctx.save(); ctx.globalAlpha = .6; ctx.beginPath(); ctx.arc(cx, yc, r, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(im, sx, sy, S, S, cx - r, yc - r, 2 * r, 2 * r); ctx.restore();
       ctx.strokeStyle = 'rgba(206,17,30,.3)'; ctx.lineWidth = Math.max(1, rowPx * .035); ctx.beginPath(); ctx.arc(cx, yc, r, 0, Math.PI * 2); ctx.stroke(); return; }
   }
@@ -1255,6 +1259,10 @@ function kidStatus(k) {
     dossier: `Dossier médical accepté, arrivée en France prévue le ${fdate(k.arrivee)}`,
     financement: `En cours de financement : ${Math.round(k.finance * 100)} %${k.arrivee ? `, arrivée envisagée ${moisDe(k.arrivee)}` : ''}` }[k.statut];
 }
+function kidWhere(k) {                // une ligne sur l'enfant, sans numéro
+  return ['rentree', 'convalescence'].includes(k.statut) ? `${acc(k, 'Opéré', 'Opérée')} à ${k.hopital}`
+    : k.statut === 'en-france' ? `${acc(k, 'Accueilli', 'Accueillie')} à ${k.accueil || k.hopital}` : `${acc(k, 'Attendu', 'Attendue')} à ${k.hopital}`;
+}
 function kidSteps(k) {
   const st = k.statut, inFr = ['en-france', 'convalescence', 'rentree'].includes(st), op = ['convalescence', 'rentree'].includes(st);
   const L = [[true, 'Dossier médical accepté par Mécénat Chirurgie Cardiaque'], [k.finance >= 1, `Opération financée${k.finance < 1 ? ` (${Math.round(k.finance * 100)} %)` : ''}`],
@@ -1266,17 +1274,54 @@ function kidSteps(k) {
 }
 const avatarFor = (txt, col) => `<div class="avatar" style="background:${col}">${esc(txt)}</div>`;
 const ageTxt = k => k.age < 1 ? `${Math.max(1, Math.round(k.age * 12))} mois` : k.age < 2 ? '1 an' : `${Math.floor(k.age)} ans`;
-const kidAvatar = (k, cls = '') => k.photo ? `<div class="avatar ${cls}" style="background:#b8323a"><img src="${esc(k.photo)}" alt="" loading="lazy" onerror="this.remove()"><span>${esc(k.prenom[0])}</span></div>` : avatarFor(k.prenom[0], '#b8323a');
+// cadrage des photos d'enfants (data/enfants.json → cadrage : centre du visage x, y, largeur du visage t, hauteur/largeur r)
+const kCad = k => Object.assign({ x: .5, y: .35, t: .4, r: 1.25 }, k.cadrage || {});
+const kPos = k => { const c = kCad(k); return `${(c.x * 100).toFixed(1)}% ${(c.y * 100).toFixed(1)}%`; };
+function kBox(k, fill = .5) {          // vignette carrée : place de la photo (en fractions du carré), le visage occupe « fill » de la largeur
+  const c = kCad(k), w = Math.max(1, fill / c.t, 1 / c.r), h = w * c.r;
+  return { w, h, x: clamp(.5 - c.x * w, 1 - w, 0), y: clamp(.5 - c.y * h, 1 - h, 0) };
+}
+const kBoxCss = (k, fill) => { const b = kBox(k, fill), P = v => (v * 100).toFixed(1) + '%'; return `position:absolute;max-width:none;object-fit:fill;width:${P(b.w)};height:${P(b.h)};left:${P(b.x)};top:${P(b.y)}`; };
+const kidAvatar = (k, cls = '') => k.photo ? `<div class="avatar ${cls}" style="background:#b8323a"><img src="${esc(k.photo)}" alt="" loading="lazy" style="${kBoxCss(k, .5)}" onerror="this.remove()"><span>${esc(k.prenom[0])}</span></div>` : avatarFor(k.prenom[0], '#b8323a');
 // lien vers la fiche d'un donateur (prénom seul par défaut)
+function saveLocal(o) {               // met à jour un don enregistré dans ce navigateur (prototype)
+  try { const L = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'), j = L.findIndex(x => x.p === o.p && x.n === o.n && x.d === o.d && x.slot === o.slot && (x.ck ?? -1) === (o.ck ?? -1));
+    if (j >= 0) { L[j].news = o.news; localStorage.setItem(LOCAL_KEY, JSON.stringify(L)); } } catch (e) {}
+}
+const NEWS_KEY = 'nom-sur-le-mat-nouvelles';
+const newsOf = k => { try { return (JSON.parse(localStorage.getItem(NEWS_KEY) || '{}'))[k.num] || null; } catch (e) { return null; } };
+const setNews = (k, v) => { try { const N = JSON.parse(localStorage.getItem(NEWS_KEY) || '{}'); if (v) N[k.num] = v; else delete N[k.num]; localStorage.setItem(NEWS_KEY, JSON.stringify(N)); } catch (e) {} };
+// « Recevoir des nouvelles » d'un enfant : depuis sa fiche (avec une adresse) ou depuis son propre don
+function newsBlock(k) {
+  const box = document.createElement('div'); box.className = 'newsbox'; const mine = D.filter(o => o.local && o.e === ENF.enfants.indexOf(k)).slice(-1)[0];
+  const draw = () => { const on = mine ? mine.news : !!newsOf(k);
+    box.innerHTML = on ? `<b>Tu suis ${esc(k.prenom)}</b><span>Tu recevras un e-mail à chaque étape : arrivée en France, opération, retour chez ${acc(k, 'lui', 'elle')}. <em>Démo : aucun e-mail n'est encore envoyé.</em></span><button class="lk" type="button" data-n="off">Ne plus recevoir</button>`
+      : `<b>Recevoir des nouvelles de ${esc(k.prenom)}</b><span>Un e-mail à chaque étape : arrivée en France, opération, retour chez ${acc(k, 'lui', 'elle')}.</span>`
+        + (mine ? `<button class="btn small red" type="button" data-n="on">Je veux des nouvelles</button>` : `<form class="nf"><input type="email" required placeholder="ton.adresse@exemple.fr" autocomplete="email" aria-label="Ton adresse e-mail"><button class="btn small red" type="submit">Je veux des nouvelles</button></form>`);
+    const off = box.querySelector('[data-n=off]'); if (off) off.onclick = () => { if (mine) { mine.news = false; saveLocal(mine); } else setNews(k, null); draw(); };
+    const onB = box.querySelector('[data-n=on]'); if (onB) onB.onclick = () => { mine.news = true; saveLocal(mine); draw(); };
+    const f = box.querySelector('form'); if (f) f.onsubmit = e => { e.preventDefault(); const m = f.querySelector('input').value.trim(); if (!m) return; setNews(k, { depuis: new Date().toISOString().slice(0, 10) }); draw(); }; };
+  draw(); return box;
+}
+// écran « Merci » : sa photo, son lien personnel pour revenir, les nouvelles de l'enfant
+function renderMine(o) {
+  const box = $('tMine'); if (!box) return; if (!o.local) { box.hidden = true; box.innerHTML = ''; return; }
+  const k = o.e >= 0 ? ENF.enfants[o.e] : null;
+  box.innerHTML = `${o.ph ? `<img class="mephoto" src="${esc(o.ph)}" alt="Ta photo">` : ''}<div><b>Ta fiche t'attend</b><span>Pour la retrouver quand tu reviendras : ton lien personnel t'est envoyé avec ton reçu fiscal, et ce navigateur s'en souvient (bouton « Ma fiche » sur l'accueil).</span>
+    <div class="mine-act"><button class="btn small" type="button" data-m="fiche">Voir ma fiche</button><button class="btn small" type="button" data-m="copy">Copier mon lien</button></div></div>`;
+  box.hidden = false; box.querySelector('[data-m=fiche]').onclick = () => openDonor(o);
+  box.querySelector('[data-m=copy]').onclick = async e => { const b = e.currentTarget; try { await navigator.clipboard.writeText(ficheURL(o)); b.textContent = 'Lien copié'; } catch (x) { b.textContent = ficheURL(o); } };
+  if (k) box.appendChild(newsBlock(k));
+}
 const donLink = (o, txt) => `<a class="dn" href="#fiche-${esc(o.slug)}" data-don="${o.i}" title="${esc(o.p + ' ' + o.n + (o.v >= 0 ? ' · ' + VILLES[o.v] : ''))}">${esc(txt ?? o.p)}</a>`;
 document.addEventListener('click', e => { const a = e.target.closest('[data-don]'); if (!a) return; e.preventDefault(); const o = D[+a.dataset.don]; if (o) openDonor(o); });
 function kidCard(k, compact) {
-  return `<div class="top">${kidAvatar(k)}<div><small>Enfant n° ${k.num} · fiche fictive</small><h3>${esc(k.prenom)}, ${ageTxt(k)}</h3><p>${esc(k.ville)}, ${esc(k.pays)}</p></div></div>
+  return `<div class="top">${kidAvatar(k)}<div><small>${esc(kidWhere(k))} · histoire fictive (démo)</small><h3>${esc(k.prenom)}, ${ageTxt(k)}</h3><p>${esc(k.ville)}, ${esc(k.pays)}</p></div></div>
     <p><b>${esc(kidStatus(k))}</b></p><div class="prog"><i style="width:${Math.round(k.finance * 100)}%"></i></div>
     ${compact ? '' : `<p>${esc(k.patho)} : ${esc(k.simple)}</p><ul class="timeline">${kidSteps(k)}</ul>`}`;
 }
 function renderDone(o) {
-  if (isCk(o)) return renderDoneCk(o);
+  renderMine(o); if (isCk(o)) return renderDoneCk(o);
   const { f, row, col } = dec(o.slot), s = rowS(row), h = hOf(s), P = o.perso >= 0 ? PERS[o.perso] : null;
   $('tMerci').textContent = P ? '' : 'Merci '; $('tName').textContent = P ? o.p + ' ' + o.n : o.p + ' !';
   document.querySelector('.thanks .merci').classList.toggle('long', ($('tMerci').textContent + $('tName').textContent).length > 13);
@@ -1483,7 +1528,7 @@ function markerBody(g, k, R, focus) {
   if (focus) sv('circle', { r: R + 7, class: 'pulse' }, g);
   sv('circle', { r: R, class: 'ring', style: `stroke:${focus ? 'var(--coeur)' : kidCol(k)}` }, g);
   sv('circle', { r: R - 3, fill: '#b8323a' }, g);
-  if (k.photo) { const im = sv('image', { href: k.photo, x: -(R - 3), y: -(R - 3), width: 2 * (R - 3), height: 2 * (R - 3), preserveAspectRatio: 'xMidYMid slice', 'clip-path': `url(#${id})` }, g); im.addEventListener('error', () => im.remove()); }
+  if (k.photo) { const b = kBox(k, .55), Q = 2 * (R - 3); const im = sv('image', { href: k.photo, x: -(R - 3) + b.x * Q, y: -(R - 3) + b.y * Q, width: b.w * Q, height: b.h * Q, preserveAspectRatio: 'none', 'clip-path': `url(#${id})` }, g); im.addEventListener('error', () => im.remove()); }
   const t = sv('text', { y: R + 15, class: 'nm' }, g); t.textContent = k.prenom;
   sv('title', {}, g).textContent = `${k.prenom}, ${ageTxt(k)} — ${k.ville} (${k.pays}) · ${kidStage(k)}`;
 }
@@ -1587,14 +1632,14 @@ function stkState(st, light) {
 const navSegs = () => SEG.filter(s => s.km > 0);
 function voyOf(o) {
   const si = stkIdx(o); if (si < 0) return null;
-  const st = STK[si], S = stkState(st), tp = S.pose ? S.pose.t : Infinity, list = []; let done = 0, todo = 0, nDone = 0;
-  for (const s of navSegs()) {
-    const span = Math.max(1, s.t1 - s.t0), a = Math.max(s.t0, tp), kd = Math.min(s.t1, NOW) > a ? s.km * (Math.min(s.t1, NOW) - a) / span : 0;
-    const b = Math.max(s.t0, tp, NOW), kf = s.t1 > b ? s.km * (s.t1 - b) / span : 0;
-    const status = s.t1 <= tp ? (s.t0 >= NOW ? 'sans' : 'avant') : s.t0 >= NOW ? 'avenir' : s.t1 <= NOW ? 'fait' : 'encours';
+  const st = STK[si], S = stkState(st), tp = S.pose ? S.pose.t : Infinity, te = tp + VALID_DAYS * DAY, list = []; let done = 0, todo = 0, nDone = 0;
+  for (const s of navSegs()) {           // le nom est à bord un an, de la pose de son autocollant à te
+    const span = Math.max(1, s.t1 - s.t0), a = Math.max(s.t0, tp), e = Math.min(s.t1, te), kd = Math.min(e, NOW) > a ? s.km * (Math.min(e, NOW) - a) / span : 0;
+    const b = Math.max(s.t0, tp, NOW), kf = e > b ? s.km * (e - b) / span : 0;
+    const status = s.t1 <= tp ? (s.t0 >= NOW ? 'sans' : 'avant') : s.t0 >= te ? 'apres' : s.t0 >= NOW ? 'avenir' : s.t1 <= NOW ? 'fait' : 'encours';
     done += kd; todo += kf; if (status === 'fait') nDone++; list.push({ s, kd, kf, status });
   }
-  return { st, S, tp, done, todo, nDone, list };
+  return { st, S, tp, te, done, todo, nDone, list, over: S.posed && NOW >= te };
 }
 // position du bateau à une date : au port, ou le long de la trace au prorata du temps
 function boatAt(t) {
@@ -1618,6 +1663,7 @@ function stkLine(st, S, me) {
   if (!S.left) return `Complet depuis le ${fd(S.done)} : il est à l'impression. ${S.pose ? `Pose prévue le ${fd(S.pose.t)} ${aLieu(S.pose.seg.lieu)}.` : ''}`;
   return `${nf(S.taken)} places sur ${nf(S.cap)} ont un nom : encore ${plural(S.left, 'nom', 'noms')} et il part à l'impression.` + (S.pose ? ` Au rythme actuel, pose vers ${fmonth(S.pose.t)} ${aLieu(S.pose.seg.lieu)}.` : '');
 }
+const VALID_DAYS = CFG.duree_jours || 365;   // un don = un an à bord ; ensuite, participer à nouveau pour poursuivre l'aventure
 const nextTrips = V => V.list.filter(x => x.status === 'avenir' || x.status === 'encours');
 // bloc de l'écran « Merci » et de la fiche
 function voyBlock(o, me) {
@@ -1627,12 +1673,15 @@ function voyBlock(o, me) {
     : `<b>0<u>km</u></b><span>pour l'instant : ${ton} nom embarque à la pose de ${me ? 'ton' : 'son'} autocollant</span>`;
   return `<div class="voy"><div class="voy-km">${head}</div>
     <div class="voy-stk"><small>Autocollant n°${st.n} · ${esc(stkWhere(st))}</small><div class="bar"><i style="width:${(S.taken / S.cap * 100).toFixed(1)}%"></i></div><span>${stkLine(st, S, me)}</span></div>
-    ${nx.length ? `<p class="voy-next">${S.posed ? `Prochains voyages de ${ton} nom` : `${Ton} nom devrait ensuite faire`} : ${nx.join(', ')}${nextTrips(V).length > 3 ? '… jusqu\'au Vendée Globe' : ''}.</p>` : ''}
+    ${nx.length ? `<p class="voy-next">${S.posed ? `Prochains voyages de ${ton} nom` : `${Ton} nom devrait ensuite faire`} : ${nx.join(', ')}${nextTrips(V).length > 3 ? '…' : ''}</p>` : ''}
+    <p class="voy-year">${V.over ? `L'année à bord de ${ton} nom s'est terminée le ${fd(V.te)}.` : isFinite(V.te) ? (S.posed ? `${Ton} nom navigue un an, jusqu'au ${fd(V.te)}.` : `${Ton} nom naviguera un an après la pose, jusque vers ${fmonth(V.te)}.`) : `${Ton} nom naviguera un an à partir de la pose.`}
+      Pour poursuivre l'aventure${V.list.some(x => x.status === 'apres' && x.s.type === 'course') ? ` (${esc(V.list.filter(x => x.status === 'apres' && x.s.type === 'course').slice(-1)[0].s.titre)}…)` : ''}, ${me ? 'il suffira de participer à nouveau' : 'il faudra participer à nouveau'}.${me ? ` <button class="lk" type="button" data-voy="again">Participer à nouveau</button>` : ''}</p>
     <div class="voy-act"><button class="btn small" type="button" data-voy="open">Le carnet de voyage de ${ton} nom</button>${S.left ? `<button class="btn small red" type="button" data-voy="share">${me ? 'Fais compléter ton autocollant' : 'Aider à compléter cet autocollant'}</button>` : ''}</div></div>`;
 }
 function bindVoy(box, o, me) {
   const a = box.querySelector('[data-voy=open]'); if (a) a.onclick = () => openVoyage(o, me);
   const b = box.querySelector('[data-voy=share]'); if (b) b.onclick = () => openShare(o.local ? 'mine' : 'donor', o);
+  const c = box.querySelector('[data-voy=again]'); if (c) c.onclick = () => { closeDlg(); startDon(); };
 }
 function renderVoy(o, me) { const box = $('tVoy'); if (!box) return; box.innerHTML = voyBlock(o, me); box.hidden = !box.innerHTML; bindVoy(box, o, me); }
 // carte des parcours
@@ -1640,15 +1689,47 @@ function voyMap(V, me) {
   const wrap = document.createElement('div'); wrap.className = 'kmap vmap';
   const svg = sv('svg', { role: 'img', 'aria-label': 'Carte des parcours du bateau' }); wrap.appendChild(svg);
   const gC = sv('g', { class: 'countries' }, svg); for (const d of Object.values(WORLD.pays)) sv('path', { d, class: 'c' }, gC);
+  const gDet = sv('g', { class: 'det' }, svg); gDet.style.display = 'none'; let det = null;     // côtes détaillées (Natural Earth 10 m), chargées au premier zoom
   const gT = sv('g', {}, svg), segs = V ? V.list : navSegs().map(s => ({ s, status: s.t1 <= NOW ? 'avant' : s.t0 >= NOW ? 'avenir' : 'encours' }));
-  const order = { avant: 0, sans: 1, avenir: 2, fait: 3, encours: 4 }, P = new Map();
-  [...segs].sort((a, b) => order[a.status] - order[b.status]).forEach(x => { if (!x.s.trace) return;
-    const p = sv('path', { d: tracePath(x.s.trace), class: 'tr ' + x.status }, gT); sv('title', {}, p).textContent = `${x.s.titre} · ${fRange(x.s.du, x.s.au)} · ${kmTxt(x.s.km)}`; P.set(x.s.id, p); });
+  const order = { avant: 0, sans: 1, apres: 2, avenir: 3, fait: 4, encours: 5 }, P = new Map(), gH = sv('g', { class: 'hits' }, svg), sorted = [...segs].sort((a, b) => order[a.status] - order[b.status]);
+  sorted.forEach(x => { if (!x.s.trace) return; const d = tracePath(x.s.trace);
+    P.set(x.s.id, sv('path', { d, class: 'tr ' + x.status }, gT));
+    const h = sv('path', { d, class: 'hit', tabindex: 0, 'aria-label': `${x.s.titre}, ${fRange(x.s.du, x.s.au)}, ${kmTxt(x.s.km)}` }, gH); h.__x = x; });
+  // bulle : nature du voyage, dates, départ et arrivée, distance, et ce que ça représente pour le nom
+  const tip = document.createElement('div'); tip.className = 'vtip'; tip.hidden = true; wrap.appendChild(tip);
+  const TYP = { course: 'Course', convoyage: 'Convoyage', entrainement: 'Entraînement', chantier: 'Chantier', escale: 'Escale' };
+  const ton = me ? 'ton' : 'son', Ton = me ? 'Ton' : 'Son';
+  const ST = V ? { avant: `Avant ${ton} nom`, sans: `Avant la pose de ${ton} nom`, fait: `${Ton} nom était à bord`, encours: `En cours · ${ton} nom est à bord`, avenir: `${Ton} nom sera à bord`, apres: `Après l'année de ${ton} nom · avec un nouveau don` }
+    : { avant: 'Terminé', encours: 'En cours', avenir: 'À venir' };
+  let cur = null;
+  const tipHtml = x => { const s = x.s, j = Math.round((Date.parse(s.au) - Date.parse(s.du)) / DAY) + 1, boucle = s.de && s.a && s.de === s.a;
+    return `<div class="vt-h"><b class="vt-ty ${esc(s.type || '')}">${esc(TYP[s.type] || 'Navigation')}</b><span>${esc(ST[x.status] || '')}${s.t0 > NOW ? ' · prévisionnel' : ''}</span></div>
+      <strong>${esc(s.titre)}</strong>
+      <dl><dt>Dates</dt><dd>${fRange(s.du, s.au)}${j > 1 ? ` (${j} jours)` : ''}</dd>
+      ${boucle ? `<dt>Départ et arrivée</dt><dd>${esc(s.de)}</dd>` : `${s.de ? `<dt>Départ</dt><dd>${esc(s.de)}</dd>` : ''}${s.a ? `<dt>Arrivée</dt><dd>${esc(s.a)}</dd>` : ''}`}
+      <dt>Distance</dt><dd>${x.status === 'encours' && x.kd != null ? `${kmTxt(x.kd)} parcourus sur ${kmTxt(s.km)}` : kmTxt(s.km)} · ${nf(Math.round(s.km / 1.852 / 10) * 10)} milles</dd></dl>
+      ${s.note ? `<small>${esc(s.note)}</small>` : ''}${s.reel ? '' : '<small class="vt-sim">Trace simulée pour la démo</small>'}`; };
+  const place = e => { const r = wrap.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = e.clientX - r.left + 14, y = e.clientY - r.top + 14; if (x + tw > r.width - 8) x = e.clientX - r.left - tw - 14; if (y + th > r.height - 8) y = e.clientY - r.top - th - 14;
+    tip.style.left = clamp(x, 8, Math.max(8, r.width - tw - 8)) + 'px'; tip.style.top = clamp(y, 8, Math.max(8, r.height - th - 8)) + 'px'; };
+  const show = (h, e) => { if (cur !== h) { if (cur) P.get(cur.__x.s.id)?.classList.remove('hov'); cur = h; P.get(h.__x.s.id)?.classList.add('hov'); tip.innerHTML = tipHtml(h.__x); tip.hidden = false; } place(e); };
+  const hide = () => { if (cur) P.get(cur.__x.s.id)?.classList.remove('hov'); cur = null; tip.hidden = true; };
+  gH.addEventListener('pointermove', e => { const h = e.target.closest('.hit'); if (h && e.pointerType === 'mouse') show(h, e); });
+  gH.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hide(); });
+  gH.addEventListener('click', e => { const h = e.target.closest('.hit'); if (h) { e.stopPropagation(); show(h, e); } });
+  gH.addEventListener('focusin', e => { const h = e.target.closest('.hit'); if (!h) return; const b = h.getBoundingClientRect(); show(h, { clientX: b.left + b.width / 2, clientY: b.top + b.height / 2 }); });
+  gH.addEventListener('focusout', hide); svg.addEventListener('click', e => { if (!e.target.closest('.hit')) hide(); });
   const marks = [], mark = (ll, cls, label) => { const [x, y] = wproj(ll[0], ll[1]), g = sv('g', { class: 'vm ' + cls }, svg); sv('circle', { r: 5 }, g);
     if (label) { const t = sv('text', { x: 9, y: cls === 'pose' ? -6 : 14 }, g); t.textContent = label; } marks.push({ g, x, y }); return g; };
   if (V && V.S.pose) { const s = V.S.pose.seg; mark(s.xy || s.trace[0], 'pose', V.S.posed ? (me ? 'Ton nom monte à bord' : 'Son nom monte à bord') : 'Pose prévue'); }
   const B = boatAt(NOW); if (B && B.ll) mark(B.ll, 'boat' + (B.moving ? ' moving' : ''), 'Le bateau aujourd\'hui');
-  const Zm = panZoom(svg, WORLD.w, WORLD.h, 6, (vb, u) => marks.forEach(m => m.g.setAttribute('transform', `translate(${m.x},${m.y}) scale(${u})`)));
+  const ports = new Map(); SEG.forEach(s => { if (s.type === 'escale' && s.xy && s.lieu && !ports.has(s.lieu)) ports.set(s.lieu, s.xy); });
+  ports.forEach((ll, lieu) => { const g = mark(ll, 'port', lieu); g.querySelector('text')?.setAttribute('y', -7); });
+  const detail = vb => { if (!det) { det = 'charge'; getJSON('data/cotes.json').then(C => { det = C; sv('path', { d: C.path, class: 'c' }, gDet); detail(Zm.vb); }).catch(() => { det = 'non'; }); return; }
+    if (typeof det !== 'object') return; const [x0, y0, x1, y1] = det.xy, on = vb.w < 140 && vb.x >= x0 && vb.y >= y0 && vb.x + vb.w <= x1 && vb.y + vb.h <= y1;
+    gDet.style.display = on ? '' : 'none'; gC.style.display = on ? 'none' : ''; };
+  const Zm = panZoom(svg, WORLD.w, WORLD.h, 0.35, (vb, u) => { marks.forEach(m => m.g.setAttribute('transform', `translate(${m.x},${m.y}) scale(${u})`));
+    svg.classList.toggle('near', vb.w < 45); if (vb.w < 160) detail(vb); else if (typeof det === 'object') { gDet.style.display = 'none'; gC.style.display = ''; } });
   const bbox = list => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     list.forEach(s => (s.trace || [s.xy]).forEach(ll => { if (!ll) return; const [x, y] = wproj(ll[0], ll[1]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }));
     return x0 < 1e9 ? [x0, y0, x1, y1] : [0, 0, WORLD.w, WORLD.h]; };
@@ -1660,13 +1741,13 @@ function voyMap(V, me) {
   ctr.innerHTML = `<button type="button" data-z="in" aria-label="Zoomer">+</button><button type="button" data-z="out" aria-label="Dézoomer">−</button><button type="button" data-z="mine">${V ? (me ? 'Tes parcours' : 'Ses parcours') : 'En ce moment'}</button><button type="button" data-z="all">Jusqu'au Vendée Globe</button>`;
   ctr.onclick = e => { const b = e.target.closest('button'); if (!b) return; const z = b.dataset.z;
     if (z === 'in') Zm.zoomCenter(0.6); else if (z === 'out') Zm.zoomCenter(1.6); else if (z === 'mine') fitList(mine()); else Zm.fitBox(0, 0, WORLD.w, WORLD.h, 1, 0); };
-  wrap.appendChild(ctr);
+  wrap.appendChild(ctr); wrap.__zm = Zm;
   const focus = id => { P.forEach((p, k) => p.classList.toggle('hl', k === id)); const s = SEG.find(x => x.id === id); if (s) fitList([s], 60); };
   return { wrap, fit: () => fitList(mine()), focus };
 }
 function voyList(V, me) {
   const ul = document.createElement('ol'); ul.className = 'voylist'; const ton = me ? 'ton' : 'son', Ton = me ? 'Ton' : 'Son';
-  const lab = { avant: `avant ${ton} nom`, sans: `avant la pose de ${ton} nom`, fait: `✓ ${ton} nom était à bord`, encours: `en cours · ${ton} nom est à bord`, avenir: `${ton} nom sera à bord` };
+  const lab = { avant: `avant ${ton} nom`, sans: `avant la pose de ${ton} nom`, fait: `✓ ${ton} nom était à bord`, encours: `en cours · ${ton} nom est à bord`, avenir: `${ton} nom sera à bord`, apres: `après l'année de ${ton} nom : avec un nouveau don` };
   let poseDone = false; const items = [];
   const poseLi = () => { const p = V.S.pose; if (!p) return; poseDone = true;
     items.push(`<li class="pose"><span class="d">${V.S.posed ? fd(p.t) : 'vers ' + fmonth(p.t)}</span><b>${V.S.posed ? `${Ton} nom est posé sur le bateau` : `Pose prévue de ${ton} autocollant`}</b><span class="k">${esc(p.seg.lieu)}</span><em>autocollant n°${V.st.n}</em></li>`); };
@@ -1729,8 +1810,8 @@ const ficheURL = o => siteURL() + '#fiche-' + o.slug;
 function shareTexts(kind, x) {
   const site = siteURL();
   if (kind === 'mine') { const o = x, k = o.e >= 0 ? ENF.enfants[o.e] : null, amt = o.amt ? ` de ${o.amt} €` : '';
-    return { subject: 'Mon nom va faire le tour du monde avec Violette Dorange', short: `Mon nom est sur le bateau de Violette Dorange et j'aide à sauver un enfant ❤️ Toi aussi, dès 10 € :`,
-      body: `Bonjour,\n\nJe viens d'aider à sauver un enfant ! J'ai fait un don${amt} à Initiatives-Cœur pour Mécénat Chirurgie Cardiaque, et mon nom embarque sur le bateau de Violette Dorange : il va faire le tour du monde avec elle, jusqu'au Vendée Globe 2028.\n\n${k ? `Mon don aide ${k.prenom}, ${ageTxt(k)}, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.\n\n` : ''}Toi aussi, tu peux mettre ton nom sur le bateau, dès 10 €, et aider un enfant : ${refURL(o)}\n\nMon nom est ici : ${ficheURL(o)}\n\nÀ bientôt,\n${o.p}`, url: ficheURL(o) }; }
+    return { subject: 'Mon nom navigue un an avec Violette Dorange', short: `Mon nom est sur le bateau de Violette Dorange et j'aide à sauver un enfant ❤️ Toi aussi, dès 10 € :`,
+      body: `Bonjour,\n\nJe viens d'aider à sauver un enfant ! J'ai fait un don${amt} à Initiatives-Cœur pour Mécénat Chirurgie Cardiaque, et mon nom embarque sur le bateau de Violette Dorange : il va naviguer avec elle pendant un an, sur ses courses et ses traversées.\n\n${k ? `Mon don aide ${k.prenom}, ${ageTxt(k)}, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.\n\n` : ''}Toi aussi, tu peux mettre ton nom sur le bateau, dès 10 €, et aider un enfant : ${refURL(o)}\n\nMon nom est ici : ${ficheURL(o)}\n\nÀ bientôt,\n${o.p}`, url: ficheURL(o) }; }
   if (kind === 'donor') { const o = x;
     return { subject: `${o.p} ${o.n} a son nom sur le bateau de Violette Dorange`, short: `${o.p} ${o.n} a son nom sur le bateau de Violette Dorange et aide à sauver un enfant ❤️`,
       body: `Bonjour,\n\nRegarde : ${o.p} ${o.n} a mis son nom sur le bateau de Violette Dorange pour aider Mécénat Chirurgie Cardiaque à faire opérer du cœur des enfants venus de loin.\n\nSa fiche : ${ficheURL(o)}\n\nToi aussi, dès 10 €, ton nom peut faire le tour du monde avec Violette : ${site}`, url: ficheURL(o) }; }
@@ -1738,7 +1819,7 @@ function shareTexts(kind, x) {
     return { subject: `L'histoire de ${k.prenom}, ${ageTxt(k)}`, short: `${k.prenom}, ${ageTxt(k)}, est soigné${acc(k, '', 'e')} grâce aux donateurs du bateau de Violette Dorange ❤️`,
       body: `Bonjour,\n\nJe te partage l'histoire de ${k.prenom}, ${ageTxt(k)}, venu${acc(k, '', 'e')} de ${k.ville} (${k.pays}) pour être opéré${acc(k, '', 'e')} du cœur en France grâce à Mécénat Chirurgie Cardiaque et aux donateurs d'Initiatives-Cœur.\n\nEn mettant ton nom sur le bateau de Violette Dorange (dès 10 €), tu peux aider d'autres enfants comme ${acc(k, 'lui', 'elle')} : ${site}`, url: site }; }
   return { subject: 'Ton nom autour du monde sur le bateau de Violette Dorange', short: 'Dès 10 €, ton nom embarque sur le bateau de Violette Dorange et tu aides à sauver un enfant ❤️',
-    body: `Bonjour,\n\nTu connais Violette Dorange ? Dès 10 €, ton prénom et ton nom peuvent embarquer sur son bateau, Initiatives-Cœur, et faire le tour du monde avec elle jusqu'au Vendée Globe 2028.\n\nChaque don aide Mécénat Chirurgie Cardiaque à faire opérer du cœur des enfants venus de loin. Et 5 donateurs tirés au sort navigueront avec Violette !\n\nC'est par ici : ${site}`, url: site };
+    body: `Bonjour,\n\nTu connais Violette Dorange ? Dès 10 €, ton prénom et ton nom peuvent embarquer sur son bateau, Initiatives-Cœur, et naviguer avec elle pendant un an, sur ses courses, en route vers le Vendée Globe 2028.\n\nChaque don aide Mécénat Chirurgie Cardiaque à faire opérer du cœur des enfants venus de loin. Et 5 donateurs tirés au sort navigueront avec Violette !\n\nC'est par ici : ${site}`, url: site };
 }
 function openShare(kind, x) {
   const T = shareTexts(kind, x), enc2 = encodeURIComponent;
@@ -1856,6 +1937,11 @@ function boatInset(g, o, x, y, w, h, s) {          // vignette « où est mon no
 }
 
 // textes communs aux images, à la vidéo et à la légende
+const SOC_PH = { on: true };          // option : la photo du donateur dans ses visuels (s'il en a mis une)
+function phBadge(g, img, cx, cy, R, s, a = 1) {   // la photo du donateur, ronde, cerclée de blanc
+  if (!img) return; g.save(); g.globalAlpha = a; g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 20 * s; g.fillStyle = '#fff'; g.beginPath(); g.arc(cx, cy, R + 6 * s, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0;
+  g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip(); const k = Math.max(2 * R / img.width, 2 * R / img.height); g.drawImage(img, cx - img.width * k / 2, cy - img.height * k * .45, img.width * k, img.height * k); g.restore();
+}
 function socInfo(o, me) {
   const k = o.e >= 0 ? ENF.enfants[o.e] : null, P = o.perso >= 0, inCk = isCk(o), full = `${o.p} ${o.n}`;
   const h = inCk ? 0 : hOf(rowS(dec(o.slot).row));
@@ -1863,11 +1949,11 @@ function socInfo(o, me) {
   const tag = inCk ? 'COCKPIT' : fmtM(h).toUpperCase();
   const kidLine = k ? `${me ? "Et j'aide à sauver" : 'Son don aide à sauver'} ${k.prenom}, ${ageTxt(k)}, venu${acc(k, '', 'e')} ${dePays(k.pays)} pour être opéré${acc(k, '', 'e')} du cœur en France.`
     : P ? `${o.p} soutient Mécénat Chirurgie Cardiaque, qui fait opérer du cœur des enfants venus de loin.` : 'Chaque don aide Mécénat Chirurgie Cardiaque à faire opérer du cœur des enfants venus de loin.';
-  const head = me ? ['MON NOM FAIT', 'LE TOUR DU MONDE', 'AVEC VIOLETTE DORANGE'] : [full.toUpperCase(), P ? 'EST À BORD' : 'FAIT LE TOUR DU MONDE', 'AVEC VIOLETTE DORANGE'];
+  const head = me ? ['MON NOM', 'NAVIGUE UN AN', 'AVEC VIOLETTE DORANGE'] : [full.toUpperCase(), P ? 'EST À BORD' : 'NAVIGUE UN AN', 'AVEC VIOLETTE DORANGE'];
   const url = me && !P ? refURL(o) : PUB();
-  const caption = (me ? `Mon nom va faire le tour du monde sur le bateau de Violette Dorange ⛵ ${lieu}.` : `${full} a son nom sur le bateau de Violette Dorange ⛵ ${lieu}.`)
+  const caption = (me ? `Mon nom navigue un an sur le bateau de Violette Dorange ⛵ ${lieu}.` : `${full} a son nom sur le bateau de Violette Dorange ⛵ ${lieu}.`)
     + `\n${kidLine.replace(/\.$/, '')} ❤️\n\nToi aussi, dès 10 €, mets ton nom sur le bateau : ${url}\n\n${TAGS()}`;
-  return { k, P, inCk, full, h, tag, kidLine, head, url, caption };
+  return { k, P, inCk, full, h, tag, kidLine, head, url, caption, ph: SOC_PH.on && o.ph ? o.ph : '' };
 }
 
 // petits outils de dessin
@@ -1902,7 +1988,7 @@ function headline(g, x, y, lines, s, maxW, a = 1) {   // trois lignes : blanc, r
 }
 function kidRow(g, x, y, w, s, info, kidImg, a = 1) {  // pastille de l'enfant + phrase
   g.save(); g.globalAlpha = a; const R = 58 * s; let tx = x;
-  if (info.k && kidImg) { g.save(); g.beginPath(); g.arc(x + R, y + R, R, 0, Math.PI * 2); g.clip(); const sc = Math.max(2 * R / kidImg.width, 2 * R / kidImg.height); g.drawImage(kidImg, x + R - kidImg.width * sc / 2, y + R - kidImg.height * sc * .42, kidImg.width * sc, kidImg.height * sc); g.restore();
+  if (info.k && kidImg) { g.save(); g.beginPath(); g.arc(x + R, y + R, R, 0, Math.PI * 2); g.clip(); const b = kBox(info.k, .5); g.drawImage(kidImg, x + b.x * 2 * R, y + b.y * 2 * R, b.w * 2 * R, b.h * 2 * R); g.restore();
     g.lineWidth = 4 * s; g.strokeStyle = C_COEUR; g.beginPath(); g.arc(x + R, y + R, R, 0, Math.PI * 2); g.stroke(); tx = x + 2 * R + 26 * s; }
   setFont(g, 400, 31 * s, F_BODY); g.fillStyle = C_ECUME; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
   const lines = wrap(g, info.kidLine, x + w - tx); let yy = y + (info.k && kidImg ? R - (lines.length - 1) * 21 * s + 10 * s : 30 * s);
@@ -1917,7 +2003,7 @@ function cta(g, x, y, w, s, info, a = 1) {           // « Toi aussi, dès 10 �
 
 // les trois formats d'image
 async function makeCard(fk, o, me) {
-  await socFonts(); const F = SOC_FMT[fk], info = socInfo(o, me), kidImg = info.k ? await loadImg(info.k.photo) : null;
+  await socFonts(); const F = SOC_FMT[fk], info = socInfo(o, me), kidImg = info.k ? await loadImg(info.k.photo) : null, phImg = info.ph ? await loadImg(info.ph) : null;
   const cv = document.createElement('canvas'); cv.width = F.w; cv.height = F.h; const g = cv.getContext('2d');
   g.fillStyle = C_ABYSSE; g.fillRect(0, 0, F.w, F.h);
   if (fk === 'fb') {                                   // bannière : bateau à gauche, texte à droite
@@ -1926,7 +2012,7 @@ async function makeCard(fk, o, me) {
     namePin(g, rect, `${info.full.toUpperCase()} · ${info.tag}`, .78, 1, W3 - 30); boatInset(g, o, 22, F.h - 22 - 216, 162, 216, .62);
     const s = .62, x = W3 + 34, w = F.w - x - 40; brand(g, x, 70, 30);
     let y = headline(g, x, 118, info.head, s, w); y = kidRow(g, x, y + 26, w, .62, info, kidImg); cta(g, x, Math.max(y + 54, F.h - 92), w, .62, info);
-    return cv;
+    phBadge(g, phImg, W3 - 40 - 64, 40 + 64, 64, .62); return cv;
   }
   const story = fk === 'story', H3 = story ? 1180 : 860, s = 1;
   const { cv: v, rect } = snap3D(o, F.w, H3, (story ? 1 / 18 : 1 / 14) * (isCk(o) ? .78 : 1)); g.drawImage(v, 0, 0);
@@ -1937,7 +2023,7 @@ async function makeCard(fk, o, me) {
   const iw = story ? 250 : 220, ih = Math.round(iw * 4 / 3); boatInset(g, o, F.w - 52 - iw, H3 - ih + (story ? 40 : 60), iw, ih, s);
   const x = 52, w = F.w - 104; let y = headline(g, x, H3 - 70, info.head, s, w - iw - 30);
   y = kidRow(g, x, y + 34, w, s, info, kidImg); cta(g, x, story ? Math.max(y + 80, 1560) : Math.max(y + 70, F.h - 150), w, s, info);
-  return cv;
+  const R = story ? 112 : 96; phBadge(g, phImg, F.w - 52 - R, (story ? 200 : 60) + R, R, s); return cv;
 }
 
 // la vidéo : survol, montée vers le nom, arrêt sur le nom, carte de fin (format vertical 9:16)
@@ -1953,7 +2039,8 @@ function drawFilm(F, t) {
   if (a1 > 0) { g.save(); g.globalAlpha = a1; const gb = g.createLinearGradient(0, H * .5, 0, H); gb.addColorStop(0, 'rgba(7,22,41,0)'); gb.addColorStop(.5, 'rgba(7,22,41,.8)'); gb.addColorStop(1, 'rgba(7,22,41,.92)'); g.fillStyle = gb; g.fillRect(0, H * .5, W, H * .5);
     g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 24 * s;
     g.fillStyle = '#fff'; fitPx(g, F.me ? 'MON NOM' : info.full.toUpperCase(), 900, F_DISP, W - 100 * s, 130 * s); g.fillText(F.me ? 'MON NOM' : info.full.toUpperCase(), W / 2, H * .72);
-    g.fillStyle = C_COEUR; setFont(g, 900, 130 * s, F_DISP); g.fillText('EMBARQUE…', W / 2, H * .72 + 130 * s); g.restore(); }
+    g.fillStyle = C_COEUR; setFont(g, 900, 130 * s, F_DISP); g.fillText('EMBARQUE…', W / 2, H * .72 + 130 * s); g.restore();
+    phBadge(g, F.phImg, W / 2, H * .72 - 250 * s, 110 * s, s, a1); }
   if (!info.inCk && t > 3.1 && t < F.tArr + 0.4) {                // compteur de hauteur pendant la montée
     const a = ease((t - 3.1) / 0.4) * (1 - ease((t - F.tArr) / 0.4)); g.save(); g.globalAlpha = a; g.textAlign = 'right';
     g.fillStyle = 'rgba(7,22,41,.82)'; rrect(g, W - 456 * s, H * .86 - 124 * s, 400 * s, 192 * s, 24 * s); g.fill(); g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 18 * s;
@@ -1962,6 +2049,7 @@ function drawFilm(F, t) {
   if (a3 > 0) {
     namePin(g, nameRect(o, W, H), `${info.full.toUpperCase()} · ${info.tag}`, s, a3);
     g.save(); g.globalAlpha = a3; const gr = g.createLinearGradient(0, H * .5, 0, H); gr.addColorStop(0, 'rgba(7,22,41,0)'); gr.addColorStop(.45, 'rgba(7,22,41,.85)'); gr.addColorStop(1, C_ABYSSE); g.fillStyle = gr; g.fillRect(0, H * .5, W, H * .5); g.restore();
+    phBadge(g, F.phImg, W - 56 * s - 90 * s, 150 * s + 90 * s, 90 * s, s, a3);
     const y = headline(g, 56 * s, H * .66, info.head, s, W - 112 * s, a3); kidRow(g, 56 * s, y + 30 * s, W - 112 * s, s, info, F.kidImg, ease((t - F.tArr - 0.6) / 0.6) * (1 - ease((t - F.tEnd) / 0.4)));
   }
   const a4 = ease((t - F.tEnd) / 0.6);
@@ -1976,7 +2064,7 @@ function drawFilm(F, t) {
 }
 async function makeFilm(o, me, onFrame) {
   if (!canFilm()) throw new Error('nosupport');
-  await socFonts(); const info = socInfo(o, me), kidImg = info.k ? await loadImg(info.k.photo) : null;
+  await socFonts(); const info = socInfo(o, me), kidImg = info.k ? await loadImg(info.k.photo) : null, phImg = info.ph ? await loadImg(info.ph) : null;
   const W = 720, H = 1280, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d'); g.fillStyle = C_ABYSSE; g.fillRect(0, 0, W, H);
   audioInit(); await decodeAll();
   const stream = cv.captureStream(30); let dest = null;
@@ -1984,7 +2072,7 @@ async function makeFilm(o, me, onFrame) {
   const mime = filmMime(), rec = new MediaRecorder(stream, Object.assign({ videoBitsPerSecond: 7e6 }, mime ? { mimeType: mime } : {}));
   const chunks = []; rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); }; const stopped = new Promise(r => rec.onstop = r);
   const sv = saveCam(); stopAuto(); landingSpin = false; const my = ++token; hideTip(); $('spot').classList.remove('show'); spotSlot = -1; spotCk = -1;
-  const restore = recSize(W, H), F = REC.film = { o, me, info, kidImg, g, W, H, t0: 0, tArr: 1e9, tEnd: 1e9 }, now = () => (performance.now() - F.t0) / 1000;
+  const restore = recSize(W, H), F = REC.film = { o, me, info, kidImg, phImg, g, W, H, t0: 0, tArr: 1e9, tEnd: 1e9 }, now = () => (performance.now() - F.t0) / 1000;
   REC.draw = ts => { if (!F.t0) F.t0 = ts; const t = (ts - F.t0) / 1000; drawFilm(F, t); if (onFrame) onFrame(cv, t); };
   let amb = null, ambG = null; [amb, ambG] = loopS('ambience_loop', 0); if (ambG) ambG.gain.setTargetAtTime(.32, SND.ctx.currentTime, .3);
   const thT = isCk(o) ? 0 : dec(o.slot).f === 0 ? 0 : Math.PI, thW = isCk(o) ? 2.35 : dec(o.slot).f === 0 ? 0.55 : Math.PI - 0.55, WIDE = 42;
@@ -2040,6 +2128,7 @@ function openSocial(o, me) {
     <div class="sgrid"><div class="sprev" id="sPrev"></div>
     <div class="sside">
     ${IN_FRAME ? `<p class="sframe">Tu es dans un aperçu intégré : le téléchargement et le partage y sont bloqués. <a href="${esc(PUB() + '#' + o.slug)}" target="_blank" rel="noopener">Ouvre la page publique</a> pour enregistrer les images et la vidéo.</p>` : ''}
+    ${o.ph ? `<label class="check sph"><input type="checkbox" id="sPh" ${SOC_PH.on ? 'checked' : ''}> Mettre ma photo sur les visuels</label>` : ''}
     <div class="sbtns"><button class="btn red" type="button" id="sShare">Partager…</button><button class="btn" type="button" id="sDl">Télécharger</button><button class="btn" type="button" id="sMake" hidden>Refaire la vidéo</button></div>
     <p class="fine" id="sNote"></p>
     <label class="slab">Texte à coller en légende <small>(modifiable)</small><textarea id="sTxt" rows="7">${esc(info.caption)}</textarea></label>
@@ -2077,6 +2166,8 @@ function openSocial(o, me) {
       if (cache.video) URL.revokeObjectURL(cache.video.url); cache.video = { blob: res.blob, url: URL.createObjectURL(res.blob), ext: res.ext }; if (cur === 'video') show('video');
     };
     b.querySelectorAll('.stab').forEach(x => x.onclick = () => { if (!busy) show(x.dataset.f); });
+    const ph = b.querySelector('#sPh'); if (ph) ph.onchange = () => { if (busy) { ph.checked = SOC_PH.on; return; } SOC_PH.on = ph.checked;
+      Object.keys(cache).forEach(k => { URL.revokeObjectURL(cache[k].url); delete cache[k]; }); show(cur); };
     bMake.onclick = () => { if (!busy) film(); };
     const act = async dl => { const c = cache[cur]; if (!c) { if (cur === 'video') { note.textContent = "Crée d'abord la vidéo."; } return; }
       const name = fname(cur, c.ext);
@@ -2197,14 +2288,29 @@ function openMap(arg) {
   const cities = VILLES.map((v, i) => i).filter(i => CNT[i] > 0).sort((a, b) => CNT[b] - CNT[a]).map((i, rank) => {
     const [x, y] = VXY[VILLES[i]], c = sv('circle', { cx: x, cy: y, r: 6 + 3.2 * Math.sqrt(CNT[i]), class: 'dot' + (i === me ? ' me' : ''), 'data-v': i }, gB);
     sv('title', {}, c).textContent = `${VILLES[i]} : ${plural(CNT[i], 'donateur', 'donateurs')}`;
-    const lg = sv('g', { class: 'clab' + (rank < 10 ? ' top' : ''), 'data-v': i }, gB); const t = sv('text', { x: 0, y: 0 }, lg); t.textContent = `${VILLES[i]} · ${CNT[i]}`;
-    return { i, x, y, c, lg, rad: SPD * 0.56 * Math.sqrt(CNT[i] * 1.3) + 1 }; });
+    const lg = sv('g', { class: 'clab' + (rank < 10 ? ' top' : ''), 'data-v': i }, gB); const t = sv('text', { x: 0, y: 0, class: 'ov' }, lg); t.textContent = `${VILLES[i]} · ${plural(CNT[i], 'donateur', 'donateurs')}`;
+    const dep = DEPS[i] || ['', '']; sv('text', { x: 0, y: -16, class: 'zm' }, lg).textContent = VILLES[i];
+    sv('text', { x: 0, y: 0, class: 'zm dep' }, lg).textContent = `${dep[1]}${dep[0] ? ' (' + dep[0] + ')' : ''} · ${plural(CNT[i], 'donateur', 'donateurs')}`;
+    return { i, x, y, c, lg, rad: SPD * 0.56 * Math.sqrt(CNT[i] * 1.3) + 1, r0: SPD * 0.56 * Math.sqrt(CNT[i] * 1.3) }; });
+  // médaillon : la France en petit, et l'endroit regardé
+  const ins = document.createElement('button'); ins.type = 'button'; ins.className = 'finset'; ins.hidden = true; ins.title = 'Revenir à toute la France'; ins.setAttribute('aria-label', 'Revenir à toute la France');
+  const isv = sv('svg', { viewBox: `-30 -30 ${GEO.w + 60} ${GEO.h + 60}`, 'aria-hidden': 'true' }); ins.appendChild(isv); sv('path', { d: GEO.path, class: 'land' }, isv);
+  const iR = sv('rect', { class: 'vw' }, isv), iC = sv('circle', { class: 'pt', r: 24 }, isv), iT = document.createElement('span'); ins.appendChild(iT);
   const dots = [], labels = new Map(), hint = document.createElement('p'); hint.className = 'fine';
   D.forEach(o => { const q = POS.get(o.i); if (!q) return; const c = sv('circle', { cx: q[0], cy: q[1], r: .1, class: 'pd' + (meO === o ? ' me' : ''), 'data-i': o.i }, meO === o ? gTop : gD); dots.push({ o, c, x: q[0], y: q[1] }); });
   const Z = window.__dbg.fz = panZoom(svg, GEO.w, GEO.h, 2.2, (vb, u) => {
     const px = SPD / u, indiv = px >= 1.6;                                // espacement des donateurs à l'écran
     svg.classList.toggle('indiv', indiv); svg.classList.toggle('names', px >= 30);
-    cities.forEach(c => { c.lg.setAttribute('transform', `translate(${c.x + (6 + 3.2 * Math.sqrt(CNT[c.i])) + 3 * u},${c.y + 4 * u}) scale(${u})`); });
+    let near = null, nd = 1e9; const vcx = vb.x + vb.w / 2, vcy = vb.y + vb.h / 2;
+    cities.forEach(c => {
+      if (!indiv) { c.lg.style.display = ''; c.lg.setAttribute('transform', `translate(${c.x + (6 + 3.2 * Math.sqrt(CNT[c.i])) + 3 * u},${c.y + 4 * u}) scale(${u})`); return; }
+      const inV = c.x + c.rad > vb.x && c.x - c.rad < vb.x + vb.w && c.y + c.rad > vb.y && c.y - c.rad < vb.y + vb.h; c.lg.style.display = inV ? '' : 'none';
+      const dd = Math.hypot(c.x - vcx, c.y - vcy); if (dd < nd) { nd = dd; near = c; }
+      if (inV) { const lx = clamp(c.x, vb.x + 90 * u, vb.x + vb.w - 90 * u), ly = clamp(c.y - c.r0 - 12 * u, vb.y + 76 * u, vb.y + vb.h - 20 * u);   // le nom de la ville reste à l'écran
+        c.lg.setAttribute('transform', `translate(${lx},${ly}) scale(${u})`); } });
+    const zoomed = vb.w < GEO.w * 0.42; ins.hidden = !zoomed;
+    if (zoomed) { const m = 14; iR.setAttribute('x', vb.x - m); iR.setAttribute('y', vb.y - m); iR.setAttribute('width', vb.w + 2 * m); iR.setAttribute('height', vb.h + 2 * m);
+      iC.setAttribute('cx', vcx); iC.setAttribute('cy', vcy); const dep = near && DEPS[near.i]; iT.textContent = near ? `${VILLES[near.i]}${dep ? ' · ' + dep[0] : ''}` : ''; }
     if (indiv) { const r = clamp(px * 0.36, 1.1, 7) * u, x0 = vb.x - 2, x1 = vb.x + vb.w + 2, y0 = vb.y - 2, y1 = vb.y + vb.h + 2;
       dots.forEach(d => { const inV = d.x > x0 && d.x < x1 && d.y > y0 && d.y < y1; d.c.style.display = inV ? '' : 'none'; if (inV) d.c.setAttribute('r', d.o === meO ? Math.max(r * 1.6, 5 * u) : r); }); }
     // prénoms quand on est assez près
@@ -2219,6 +2325,7 @@ function openMap(arg) {
   });
   const ctr = document.createElement('div'); ctr.className = 'kctrl';
   ctr.innerHTML = `<button type="button" data-z="in" aria-label="Zoomer">+</button><button type="button" data-z="out" aria-label="Dézoomer">−</button><button type="button" data-z="fr">Toute la France</button>${meO && POS.get(meO.i) ? `<button type="button" data-z="me">${esc(meO.p)}</button>` : ''}`;
+  wrap.appendChild(ins); ins.onclick = () => Z.fitBox(0, 0, GEO.w, GEO.h, 1.02, 0);
   ctr.onclick = e => { const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.z === 'in') Z.zoomCenter(0.55); else if (b.dataset.z === 'out') Z.zoomCenter(1.8); else if (b.dataset.z === 'fr') Z.fitBox(0, 0, GEO.w, GEO.h, 1.02, 0);
     else { const q = POS.get(meO.i); Z.flyTo(q[0], q[1], 7, 900); } };
@@ -2272,7 +2379,7 @@ function openDonor(o) {
   const inCk = isCk(o), h = inCk ? 0 : hOf(rowS(dec(o.slot).row)), k = o.e >= 0 ? ENF.enfants[o.e] : null;
   const pal = CFG.afficher_palier && o.pal >= 0 ? CTP.paliers[o.pal] : null;
   const ville = o.v >= 0 ? VILLES[o.v] : '', dep = o.v >= 0 ? DEPS[o.v] : null;
-  const av = o.ph ? `<img src="${esc(o.ph)}" alt="">` : esc((o.p[0] || '') + (o.n[0] || ''));
+  const av = o.ph ? `<img src="${esc(o.ph)}" alt="" ${o.phDemo ? 'title="Photo fictive (démo)"' : ''}>` : esc((o.p[0] || '') + (o.n[0] || ''));
   const voisins = o.v >= 0 ? D.filter(x => x.v === o.v && x !== o).length : 0;
   const html = `<div class="dcard">
     <div class="top"><div class="avatar big" style="background:${PALCOL[o.pal] || '#2b5a87'}">${av}</div>
@@ -2280,7 +2387,7 @@ function openDonor(o) {
       <div class="where">${pal ? `<span class="pill gold">${esc(pal.nom)}</span>` : ''}<span class="pill">Inscrit le ${fdate(o.d)}</span>${o.local ? '<span class="pill red">Nouveau</span>' : ''}</div></div></div>
     ${o.b ? `<p class="bio">${esc(o.b)}</p>` : ''}
     ${o.m ? `<blockquote class="quote">« ${esc(o.m)} »<small>${o.local ? 'En attente de validation' : 'Son message'}</small></blockquote>` : ''}
-    ${inCk ? `<div class="place"><small>Sa place dans le cockpit</small><b>${ckLabel(o.ck)}</b><span>sous les yeux de Violette, pendant toutes ses courses</span></div>`
+    ${inCk ? `<div class="place"><small>Sa place dans le cockpit</small><b>${ckLabel(o.ck)}</b><span>sous les yeux de Violette, pendant un an de courses</span></div>`
       : `<div class="place"><small>Sa place sur le mât</small><b>${slotLabel(o.slot)}</b><span>${fmtM(h)} au-dessus du pont</span></div>`}
     <div class="voybox">${voyBlock(o, !!o.local)}</div>
     ${k ? `<div class="kid"><small>Son don participe à sauver</small>${kidCard(k, true)}</div>` : ''}
@@ -2332,7 +2439,7 @@ function openKid(k) {
   const map = kidsMiniMap(k);
   const card = document.createElement('div'); card.className = 'kid'; card.innerHTML = kidCard(k, false);
   const ph = document.createElement('div'); ph.className = 'photos';
-  ph.innerHTML = k.photo ? `<figure><img src="${esc(k.photo)}" alt="Portrait de ${esc(k.prenom)}"><figcaption>${k.photo_illustration ? 'Illustration · enfant fictif (démo)' : k.photo_demo ? 'Photo d\'un enfant opéré grâce à Mécénat Chirurgie Cardiaque · prénom et histoire fictifs (démo)' : 'Photo Mécénat Chirurgie Cardiaque, avec l\'accord de la famille'}</figcaption></figure>`
+  ph.innerHTML = k.photo ? `<figure><img src="${esc(k.photo)}" alt="Portrait de ${esc(k.prenom)}" style="object-position:${kPos(k)}"><figcaption>${k.photo_illustration ? 'Illustration · enfant fictif (démo)' : k.photo_demo ? 'Photo d\'un enfant opéré grâce à Mécénat Chirurgie Cardiaque · prénom et histoire fictifs (démo)' : 'Photo Mécénat Chirurgie Cardiaque, avec l\'accord de la famille'}</figcaption></figure>`
     : `<figure><div class="ph"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-8 8"/></svg>Photo transmise par Mécénat Chirurgie Cardiaque<br>avec l'accord de la famille</div></figure>`;
   const info = document.createElement('div'); info.className = 'recap';
   const st = k.statut, inFr = ['en-france', 'convalescence', 'rentree'].includes(st), op = ['convalescence', 'rentree'].includes(st);
@@ -2353,7 +2460,7 @@ function openKid(k) {
   L.style.display = R.style.display = 'grid'; L.style.gap = R.style.gap = '12px'; L.append(ph, map); R.append(card, info); two.append(L, R);
   const shr = document.createElement('div'); shr.className = 'actions'; shr.innerHTML = `<button class="btn primary" type="button">Partager l'histoire de ${esc(k.prenom)}</button><button class="btn" type="button">Mettre mon nom sur le bateau</button>`;
   shr.children[0].onclick = () => openShare('kid', k); shr.children[1].onclick = () => { closeDlg(); if (app.dataset.view === 'landing') leaveLanding(startDon); else startDon(); };
-  openDlg(`${k.prenom}, ${ageTxt(k)}`, [two, team, who, shr, note].filter(Boolean));
+  openDlg(`${k.prenom}, ${ageTxt(k)}`, [two, newsBlock(k), team, who, shr, note].filter(Boolean));
 }
 
 openDonor = dlgNav(openDonor); openPerso = dlgNav(openPerso); openKid = dlgNav(openKid); openKids = dlgNav(openKids); openKidsMap = dlgNav(openKidsMap);
@@ -2460,7 +2567,8 @@ $('dPhoto').addEventListener('change', e => {            // photo réduite à 32
   const img = new Image(); img.onload = () => { const k = 320 / Math.max(img.width, img.height), cv = document.createElement('canvas');
     cv.width = Math.round(img.width * Math.min(1, k)); cv.height = Math.round(img.height * Math.min(1, k)); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
     DS.photo = cv.toDataURL('image/jpeg', 0.82); $('dPhotoPrev').src = DS.photo; $('dPhotoPrev').hidden = false; URL.revokeObjectURL(img.src); };
-  img.src = URL.createObjectURL(f);
+  img.onerror = () => { $('dPhotoPrev').hidden = true; DS.photo = ''; $('dPhotoMsg').hidden = false; };
+  $('dPhotoMsg').hidden = true; img.src = URL.createObjectURL(f);
 }); $('dVille').addEventListener('input', checkInfo);
 function checkInfo() { $('infoNext').disabled = !($('dPrenom').value.trim() && $('dNom').value.trim() && $('dOk').checked); }
 function renderRecap() {
@@ -2477,14 +2585,14 @@ $('pay').onclick = async () => {
   const inCk = DS.zone === 'ck' && DS.ck >= 0 && ckOwner[DS.ck] < 0, sl = inCk ? -1 : DS.slot >= 0 && owner[DS.slot] < 0 ? DS.slot : nextAuto(), ref = 'MAT-' + Date.now().toString(36).toUpperCase();
   if (CFG.don_url) {
     const u = CFG.don_url.replace('{montant}', DS.amt).replace('{ref}', ref);
-    const q = new URLSearchParams({ emplacement: inCk ? ckLabel(DS.ck) : slotLabel(sl), zone: inCk ? 'cockpit' : 'mat', place: inCk ? DS.ck : sl, prenom: DS.p, nom: DS.n, ville: DS.ville, message: DS.msg });
+    const q = new URLSearchParams({ emplacement: inCk ? ckLabel(DS.ck) : slotLabel(sl), zone: inCk ? 'cockpit' : 'mat', place: inCk ? DS.ck : sl, prenom: DS.p, nom: DS.n, ville: DS.ville, message: DS.msg, nouvelles: $('dNews').checked ? '1' : '0' });
     location.href = u + (u.includes('?') ? '&' : '?') + q.toString(); return;
   }
   const vi = VILLES.findIndex(v => norm(v) === norm(DS.ville));
   const kid = ENF.enfants.findIndex(e => e.finance < 1);
   const pub = $('dPub').checked;
   const o = { slot: sl, p: DS.p, n: DS.n, v: vi, pal: palierOf(DS.amt), m: DS.msg, perso: -1, d: new Date().toISOString().slice(0, 10), e: kid >= 0 ? kid : ENF.enfants.length - 1, local: true, amt: DS.amt, ck: inCk ? DS.ck : -1, i: D.length, r: PAR ? PAR.i : -1,
-              b: pub ? $('dBio').value.trim() : '', ph: pub ? DS.photo || '' : '' };
+              b: pub ? $('dBio').value.trim() : '', ph: pub ? DS.photo || '' : '', news: $('dNews').checked };
   D.push(o); occupy(o); reindex();
   try { const saved = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); saved.push(o); localStorage.setItem(LOCAL_KEY, JSON.stringify(saved)); } catch (e) {}
   setPick(false); if (sl >= 0) redrawSlot(sl); DS.ck = -1; ckSel = -1; drawCk(); renderStats(); $('dPrenom').value = $('dNom').value = $('dMsg').value = $('dBio').value = ''; $('dOk').checked = false; DS.photo = ''; $('dPhotoPrev').hidden = true;
@@ -2495,6 +2603,8 @@ $('pay').onclick = async () => {
 function renderLanding() {
   $('lStats').innerHTML = `<div><b>${nf(D.length)}</b><span>noms déjà à bord</span></div><div><b>${nf(ENF.anterieurs + NKIDS_DONE)}</b><span>enfants opérés avec Initiatives-Cœur</span></div><div><b>≈ 45 000 km</b><span>autour du monde au Vendée Globe</span></div>`;
   $('lExploreTxt').textContent = `les ${nf(D.length)} noms déjà à bord, les enfants qu'ils aident, la carte du monde`;
+  const mine = D.filter(o => o.local).slice(-1)[0], lm = $('lMine');
+  if (lm) { lm.hidden = !mine; if (mine) { lm.innerHTML = `${mine.ph ? `<img src="${esc(mine.ph)}" alt="">` : ''}<span>Bon retour${mine.p ? `, <b>${esc(mine.p)}</b>` : ''} : ma fiche</span>`; lm.onclick = () => leaveLanding(() => openDonor(mine)); } }
   const li = $('lInvite'); if (PAR) { li.innerHTML = `<svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg><span><b>${esc(PAR.p)} ${esc(PAR.n)}</b> a mis son nom sur le bateau et t'invite à embarquer.</span>`; li.hidden = false; }
 }
 function showLanding() { closeDlg(); renderLanding(); setView('landing'); landingSpin = true; spotSlot = -1; $('spot').classList.remove('show'); $('alti').classList.remove('armed'); dirty = true; introLoop(); }
@@ -2572,4 +2682,4 @@ addEventListener('hashchange', fromHash);
 requestAnimationFrame(frame);
 setTimeout(() => $('loading').classList.add('done'), 150);
 if (!location.hash) showLanding(); else fromHash();
-window.__dbg = {}; window.__mat = { navPose, survol, camera, rig, boat, THREE, nav, D, owner, dec, enc, rowS, travel, tour, startDon, pickAt, screenRect, tiles, renderer, ck, ckTurn, ckViewPanel, ckPanels, makeCard, openSocial, pano, ckEye, get dirty() { return dirty; }, set dirty(v) { dirty = v; } };
+window.__dbg = {}; window.__mat = { wproj, navPose, survol, camera, rig, boat, THREE, nav, D, owner, dec, enc, rowS, travel, tour, startDon, pickAt, screenRect, tiles, renderer, ck, ckTurn, ckViewPanel, ckPanels, makeCard, openSocial, pano, ckEye, get dirty() { return dirty; }, set dirty(v) { dirty = v; } };

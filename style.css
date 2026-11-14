@@ -205,7 +205,7 @@ input:focus, textarea:focus { border-color: var(--ciel); outline: none; box-shad
 .kidtwo .photos figure { flex-basis: 100%; aspect-ratio: 4 / 3; }
 .kidtwo .photos figure img { object-position: 50% 28%; }
 .photos figure { margin: 0; flex: 0 0 82%; max-height: 260px; scroll-snap-align: start; border-radius: 12px; overflow: hidden; background: var(--houle2); aspect-ratio: 4 / 3; position: relative; display: grid; place-items: center; }
-.photos img { width: 100%; height: 100%; object-fit: cover; }
+.photos img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }   /* remplit le cadre : le cadrage (object-position) vise le visage */
 .photos figcaption { position: absolute; left: 8px; bottom: 6px; font-size: 11px; color: #fff; text-shadow: 0 1px 4px #000; }
 .ph { display: grid; gap: 6px; place-items: center; color: var(--brume); font-size: 13px; text-align: center; padding: 10px; }
 .ph svg { width: 40px; height: 40px; fill: none; stroke: var(--brume); stroke-width: 1.6; }
@@ -435,6 +435,17 @@ a.dn:hover { color: var(--ciel); }
 .fmap .clab text { font: 800 13px var(--display); fill: #fff; letter-spacing: .03em; paint-order: stroke; stroke: rgba(7,22,41,.9); stroke-width: 4px; pointer-events: none; }
 .fmap .clab { display: none; }
 .fmap .clab.top { display: block; }
+.fmap .clab .zm { display: none; }
+.fmap svg.indiv .clab .ov { display: none; }
+.fmap svg.indiv .clab .zm { display: block; text-anchor: middle; font-size: 17px; letter-spacing: .06em; text-transform: uppercase; }
+.fmap svg.indiv .clab .zm.dep { font: 700 12px var(--body); letter-spacing: 0; text-transform: none; fill: #cfe3f5; }
+.finset { position: absolute; left: 10px; bottom: 10px; width: 118px; height: 118px; padding: 12px 12px 18px; border-radius: 50%; border: 2px solid rgba(143,208,255,.55); background: rgba(7,22,41,.88); box-shadow: 0 6px 18px rgba(0,0,0,.45); cursor: pointer; display: grid; place-items: center; z-index: 2; }
+.finset[hidden] { display: none; }
+.finset svg { width: 100%; height: 100%; overflow: visible; }
+.finset .land { fill: #24486e; stroke: rgba(159,179,201,.7); stroke-width: .8; vector-effect: non-scaling-stroke; }
+.finset .vw { fill: rgba(206,17,30,.25); stroke: var(--coeur); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.finset .pt { fill: var(--coeur); stroke: #fff; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.finset span { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); white-space: nowrap; font: 800 10.5px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: #fff; }
 .fmap svg.indiv .clab { display: block; }
 .fmap svg.indiv .dot { fill-opacity: .08; pointer-events: none; }
 .fmap .donors, .fmap .dlabels { display: none; }
@@ -589,11 +600,31 @@ a.dn:hover { color: var(--ciel); }
 .vmap .tr.fait { stroke: var(--coeur); stroke-width: 3; }
 .vmap .tr.encours { stroke: var(--coeur); stroke-width: 3; stroke-dasharray: 8 4; animation: voyflow 1.2s linear infinite; }
 .vmap .tr.hl { stroke-width: 5; stroke: #ffd166; }
+.vmap .tr.hov { stroke-width: 5; stroke: #ffd166; stroke-dasharray: none; }
+.vmap .hit { fill: none; stroke: transparent; stroke-width: 16; vector-effect: non-scaling-stroke; pointer-events: stroke; cursor: pointer; stroke-linecap: round; outline: none; }
+.vtip { position: absolute; z-index: 3; width: max-content; max-width: min(300px, 80%); padding: 10px 12px; border-radius: 12px; background: rgba(7,22,41,.94); border: 1px solid rgba(143,208,255,.35); box-shadow: 0 8px 24px rgba(0,0,0,.45); pointer-events: none; font-size: 13px; line-height: 1.35; color: var(--ecume); }
+.vtip .vt-h { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-bottom: 3px; }
+.vtip .vt-h span { color: var(--brume); font-size: 12px; }
+.vtip .vt-ty { font: 800 12px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; padding: 3px 7px 2px; border-radius: 6px; background: #24486e; color: #fff; }
+.vtip .vt-ty.course { background: var(--coeur); }
+.vtip .vt-ty.convoyage { background: #2c6aa0; }
+.vtip .vt-ty.entrainement { background: #1f8a62; }
+.vtip strong { display: block; font: 800 17px/1.15 var(--display); text-transform: uppercase; letter-spacing: .02em; margin: 4px 0 6px; }
+.vtip dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; }
+.vtip dt { color: var(--brume); }
+.vtip dd { margin: 0; }
+.vtip small { display: block; margin-top: 6px; color: var(--brume); }
+.vtip .vt-sim { font-style: italic; opacity: .8; }
 @keyframes voyflow { to { stroke-dashoffset: -24; } }
 .vmap .vm circle { stroke: #071629; stroke-width: 2; }
 .vmap .vm text { font: 700 12px var(--body); fill: #fff; paint-order: stroke; stroke: #071629; stroke-width: 3px; }
 .vmap .vm.pose circle { fill: var(--coeur); }
 .vmap .vm.boat circle { fill: #fff; }
+.vmap .det .c { stroke: rgba(159,179,201,.45); stroke-width: .7; vector-effect: non-scaling-stroke; }
+.vmap .vm.port { display: none; pointer-events: none; }
+.vmap svg.near .vm.port { display: block; }
+.vmap .vm.port circle { r: 3; fill: #cfe3f5; stroke-width: 1.5; }
+.vmap .vm.port text { font-size: 11px; fill: #cfe3f5; text-anchor: middle; }
 .vmap .vm.boat.moving circle { animation: voypulse 1.6s ease-in-out infinite; }
 @keyframes voypulse { 50% { r: 8; } }
 .klegend .lg-tr { width: 22px; height: 0; border-radius: 0; border-top: 3px solid var(--coeur); }
@@ -635,3 +666,20 @@ a.dn:hover { color: var(--ciel); }
 .voylist li.pre summary { cursor: pointer; padding: 10px 12px; border-radius: 10px; background: var(--houle); font-size: 14px; color: var(--brume); font-weight: 700; }
 .voylist li.pre .voylist { margin-top: 6px; }
 .ckcredit { position: absolute; left: 12px; right: 64px; top: 58px; z-index: 3; font-size: 11px; line-height: 1.3; color: rgba(255,255,255,.85); text-shadow: 0 1px 3px rgba(0,0,0,.7); pointer-events: none; }
+
+/* écran « Merci » : ta fiche, ton lien, les nouvelles de l'enfant ; accueil : bon retour */
+.mine { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; margin: 14px 0; padding: 14px; border-radius: 14px; background: rgba(143,208,255,.08); border: 1px solid rgba(143,208,255,.25); }
+.mine > div { display: grid; gap: 6px; } .mine b { font: 800 18px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; } .mine span { color: var(--brume); font-size: 14px; line-height: 1.4; }
+.mine .mephoto { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 3px solid #fff; }
+.mine .mine-act { display: flex; gap: 8px; flex-wrap: wrap; }
+.mine .newsbox { grid-column: 1 / -1; }
+.newsbox { display: grid; gap: 6px; padding: 12px 14px; border-radius: 12px; background: rgba(206,17,30,.10); border: 1px solid rgba(206,17,30,.35); }
+.newsbox b { font: 800 17px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; } .newsbox span { color: var(--brume); font-size: 14px; line-height: 1.4; } .newsbox em { opacity: .8; }
+.newsbox .nf { display: flex; gap: 8px; flex-wrap: wrap; } .newsbox .nf input { flex: 1 1 200px; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(143,208,255,.35); background: rgba(7,22,41,.6); color: #fff; font: inherit; }
+.newsbox .lk { justify-self: start; }
+.lmine { display: flex; align-items: center; gap: 10px; width: 100%; margin: 10px 0 0; padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(143,208,255,.4); background: rgba(143,208,255,.1); color: #fff; font: 600 15px/1.2 var(--body); cursor: pointer; text-align: left; }
+.lmine img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; }
+.lmine[hidden] { display: none; }
+.warn { color: #ffb3b8; }
+.sph { margin: 4px 0 8px; }
+.voy-year { margin: 8px 0 0; font-size: 14px; color: var(--brume); }

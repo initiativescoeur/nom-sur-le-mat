@@ -113,7 +113,13 @@
     "inf-nantes",
     "accueil-551"
    ],
-   "photo_demo": true
+   "photo_demo": true,
+   "cadrage": {
+    "x": 0.555,
+    "y": 0.283,
+    "t": 0.298,
+    "r": 1.25
+   }
   },
   {
    "num": 552,
@@ -144,7 +150,13 @@
     "anest-lyon",
     "accueil-552"
    ],
-   "photo_demo": true
+   "photo_demo": true,
+   "cadrage": {
+    "x": 0.498,
+    "y": 0.372,
+    "t": 0.483,
+    "r": 1.25
+   }
   },
   {
    "num": 553,
@@ -175,7 +187,13 @@
     "inf-paris",
     "accueil-553"
    ],
-   "photo_demo": true
+   "photo_demo": true,
+   "cadrage": {
+    "x": 0.487,
+    "y": 0.492,
+    "t": 0.58,
+    "r": 1.25
+   }
   },
   {
    "num": 554,
@@ -205,7 +223,13 @@
     "chir-bordeaux",
     "accueil-554"
    ],
-   "photo_demo": true
+   "photo_demo": true,
+   "cadrage": {
+    "x": 0.266,
+    "y": 0.563,
+    "t": 0.473,
+    "r": 1.25
+   }
   },
   {
    "num": 555,
@@ -236,7 +260,14 @@
     "anest-toulouse",
     "accueil-555"
    ],
-   "photo_demo": true
+   "photo_demo": true,
+   "cadrage": {
+    "x": 0.51,
+    "y": 0.326,
+    "t": 0.35,
+    "r": 1.25,
+    "manuel": true
+   }
   },
   {
    "num": 556,
@@ -266,7 +297,13 @@
     "chir-rennes",
     "accueil-556"
    ],
-   "photo_demo": true
+   "photo_demo": true,
+   "cadrage": {
+    "x": 0.509,
+    "y": 0.389,
+    "t": 0.331,
+    "r": 1.25
+   }
   },
   {
    "num": 557,
@@ -296,7 +333,13 @@
     "chir-lille",
     "accueil-557"
    ],
-   "photo_demo": true
+   "photo_demo": true,
+   "cadrage": {
+    "x": 0.584,
+    "y": 0.307,
+    "t": 0.472,
+    "r": 1.25
+   }
   },
   {
    "num": 558,
@@ -327,7 +370,13 @@
     "inf-marseille",
     "accueil-558"
    ],
-   "photo_demo": true
+   "photo_demo": true,
+   "cadrage": {
+    "x": 0.298,
+    "y": 0.242,
+    "t": 0.409,
+    "r": 1.25
+   }
   }
  ],
  "collecte": 84985,
