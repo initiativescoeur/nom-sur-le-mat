@@ -523,14 +523,14 @@ const ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
    de chaque paroi (relevé sur le modèle 3D). On regarde le cockpit à 360° depuis son centre (glisser pour tourner, pincer pour zoomer). */
 const ckCanvas = document.createElement('canvas'), CKTX = 4096;
 ckCanvas.width = CKTX; ckCanvas.height = Math.round(CKTX * CK.h / CK.w);
-const ckTex = new THREE.CanvasTexture(ckCanvas); ckTex.colorSpace = THREE.SRGBColorSpace; ckTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+const ckTex = new THREE.CanvasTexture(ckCanvas); ckTex.colorSpace = THREE.SRGBColorSpace; ckTex.anisotropy = renderer.capabilities.getMaxAnisotropy(); ckTex.premultiplyAlpha = true;
+const printMat = map => new THREE.MeshLambertMaterial({ map, emissiveMap: map, emissive: 0xffffff, emissiveIntensity: 0.3, transparent: true, premultipliedAlpha: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const CKR = CK.ref || [4096, Math.round(4096 * CK.h / CK.w)], CKC = CK.cells;
 // plans des parois (x = a + bz·z + cy·y, repère du bateau) ; oeil = point de vue de la vue à 360°
 const CKG = Object.assign({ oeil: [-0.03, 1.85, -5.65], h: 0.76,
   murs: [{ a: -0.2640, bz: -0.2598, cy: 0.2015, y: 1.46, z: -4.80 }, { a: 0.2039, bz: 0.2598, cy: -0.2014, y: 1.46, z: -4.80 }],
-  cloison: { c: [-0.03, 1.55, -4.32], w: 1.7, h: 0.68 } }, CK.geo || {});
+  cloison: { c: [-0.03, 1.55, -4.31], w: 1.7, h: 0.68 } }, CK.geo || {});
 const ckEye = new THREE.Vector3(...CKG.oeil);
-const ckFrameMat = new THREE.MeshStandardMaterial({ color: 0x1b1f26, roughness: 0.5, metalness: 0.2 });
 const ckLamp = new THREE.PointLight(0xfff1dd, 1.6, 3.4, 1.6); ckLamp.position.set(ckEye.x, 2.05, ckEye.z + 0.2); boat.add(ckLamp);
 const CKS = CKG.h / ((CK.portraits[0] || { area: [0, 0, 1, 1547] }).area[3]);   // mètres par pixel de référence sur les parois
 const ckHeadPx = () => ckCanvas.height * CK.head / CK.h;
@@ -543,19 +543,17 @@ TYPO_KIDS.forEach(k => { k.img = new Image(); k.img.onload = () => { k.duo = nul
 const ckPanels = TYPO_KIDS.map((kid, s) => {
   const M = CKG.murs[s], cx = M.a + M.bz * M.z + M.cy * M.y, N = new THREE.Vector3(1, -M.cy, -M.bz).normalize().multiplyScalar(-Math.sign(cx));
   const U = WUP.clone().addScaledVector(N, -N.y).normalize(), R = N.clone().negate().cross(U).normalize();   // regard = −N, droite = regard × haut
-  const a = kid.area, h = CKG.h, w = h * a[2] / a[3], C = new THREE.Vector3(cx, M.y, M.z).addScaledVector(N, 0.012);
+  const a = kid.area, h = CKG.h, w = h * a[2] / a[3], C = new THREE.Vector3(cx, M.y, M.z).addScaledVector(N, 0.003);
   const geo = new THREE.PlaneGeometry(w, h), uv = geo.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, (a[0] + uv.getX(i) * a[2]) / CKR[0], 1 - (a[1] + (1 - uv.getY(i)) * a[3]) / CKR[1]);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: ckTex, toneMapped: false, color: 0xeeeeee }));
+  const mesh = new THREE.Mesh(geo, printMat(ckTex));
   const B4 = new THREE.Matrix4().makeBasis(R, U, N); mesh.matrixAutoUpdate = false; mesh.matrix.copy(B4).setPosition(C); mesh.userData.side = s; boat.add(mesh);
-  const fr = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, h + 0.04, 0.012), ckFrameMat); fr.matrixAutoUpdate = false; fr.matrix.copy(B4).setPosition(C.clone().addScaledVector(N, -0.008)); boat.add(fr);
   return { s, mesh, C, R, U, N, w, h, a };
 });
 const lgCanvas = document.createElement('canvas'); lgCanvas.width = 2048; lgCanvas.height = Math.round(2048 * CKG.cloison.h / CKG.cloison.w);
-const lgTex = new THREE.CanvasTexture(lgCanvas); lgTex.colorSpace = THREE.SRGBColorSpace; lgTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-const lgMesh = new THREE.Mesh(new THREE.PlaneGeometry(CKG.cloison.w, CKG.cloison.h), new THREE.MeshBasicMaterial({ map: lgTex, toneMapped: false, color: 0xeeeeee }));
+const lgTex = new THREE.CanvasTexture(lgCanvas); lgTex.colorSpace = THREE.SRGBColorSpace; lgTex.anisotropy = renderer.capabilities.getMaxAnisotropy(); lgTex.premultiplyAlpha = true;
+const lgMesh = new THREE.Mesh(new THREE.PlaneGeometry(CKG.cloison.w, CKG.cloison.h), printMat(lgTex));
 lgMesh.position.set(...CKG.cloison.c); lgMesh.rotation.y = Math.PI; boat.add(lgMesh);
-{ const fr = new THREE.Mesh(new THREE.BoxGeometry(CKG.cloison.w + 0.04, CKG.cloison.h + 0.04, 0.012), ckFrameMat); fr.position.set(CKG.cloison.c[0], CKG.cloison.c[1], CKG.cloison.c[2] + 0.008); boat.add(fr); }
 // pixel de référence (X, Y) d'un portrait → point 3D sur sa paroi
 function ckPt(s, X, Y, out = new THREE.Vector3()) { const P = ckPanels[s]; if (!P) return out.copy(ckEye);
   return out.copy(P.C).addScaledVector(P.R, ((X - P.a[0]) / P.a[2] - 0.5) * P.w).addScaledVector(P.U, (0.5 - (Y - P.a[1]) / P.a[3]) * P.h).addScaledVector(P.N, 0.002); }
@@ -589,21 +587,20 @@ function drawCkHead(ctx, W, hp) {
 function kidDuo(kid, k) {                       // les tons du portrait (calculés hors ligne, cockpit_cells.py) → couleurs, à la taille de la zone
   if (kid.duo && kid.duo.k === k) return kid.duo.cv;
   const w = Math.ceil(kid.area[2] * k), h = Math.ceil(kid.area[3] * k), C = document.createElement('canvas'); C.width = w; C.height = h;
-  const c = C.getContext('2d'), [c0, c1, c2] = kid.pal.map(hex3), cb = hex3(kid.bg); c.fillStyle = kid.bg; c.fillRect(0, 0, w, h);
+  const c = C.getContext('2d'), [c0, c1, c2] = kid.pal.map(hex3);
   const img = kid.img; if (!(img && img.complete && img.naturalWidth)) return C;
   const P = document.createElement('canvas'); P.width = img.naturalWidth; P.height = img.naturalHeight; const pc = P.getContext('2d', { willReadFrequently: true });
   pc.drawImage(img, 0, 0); const im = pc.getImageData(0, 0, P.width, P.height), a = im.data;
   for (let i = 0; i < a.length; i += 4) {
     const g0 = clamp((a[i] / 255 - 0.1) / 0.8, 0, 1), g = g0 * g0 * (3 - 2 * g0), A = a[i + 3] / 255, lo = g < 0.5, f = lo ? g / 0.5 : (g - 0.5) / 0.5, u = lo ? c0 : c1, v = lo ? c1 : c2;
-    for (let j = 0; j < 3; j++) a[i + j] = (u[j] + (v[j] - u[j]) * f) * A + cb[j] * (1 - A);
-    a[i + 3] = 255;
+    for (let j = 0; j < 3; j++) a[i + j] = u[j] + (v[j] - u[j]) * f;
+    a[i + 3] = Math.round(A * 255);
   }
   pc.putImageData(im, 0, 0); c.imageSmoothingQuality = 'high'; c.drawImage(P, 0, 0, w, h);
   kid.duo = { k, cv: C }; return C;
 }
 function drawPortrait(ctx, kid, side, k) {      // chaque place est une case : le nom la remplit exactement (justifié), aucun mot n'en recouvre un autre
   const X = kid.area[0] * k, Y = kid.area[1] * k, w = Math.ceil(kid.area[2] * k), h = Math.ceil(kid.area[3] * k);
-  ctx.fillStyle = kid.bg; ctx.beginPath(); ctx.roundRect(X, Y, w, h, 22 * k); ctx.fill(); ctx.strokeStyle = 'rgba(19,41,75,.12)'; ctx.lineWidth = 3 * k; ctx.stroke();
   const T = document.createElement('canvas'); T.width = w; T.height = h; const t = T.getContext('2d'); t.textAlign = 'left'; t.textBaseline = 'middle'; t.fillStyle = '#000';
   for (let c = 0; c < CKC.length; c++) {
     const q = CKC[c]; if (q[0] !== side) continue;
@@ -612,17 +609,17 @@ function drawPortrait(ctx, kid, side, k) {      // chaque place est une case : l
     t.save(); t.translate(bx, by + bh * 0.53); t.scale(sx, sy); t.globalAlpha = i >= 0 ? 1 : 0.5; t.fillText(nm, 0, 0); t.restore();
   }
   const duo = kidDuo(kid, k); t.globalCompositeOperation = 'source-in'; t.drawImage(duo, 0, 0); t.globalCompositeOperation = 'source-over';
-  ctx.save(); ctx.beginPath(); ctx.roundRect(X, Y, w, h, 22 * k); ctx.clip(); ctx.globalAlpha = 0.3; ctx.drawImage(duo, X, Y); ctx.globalAlpha = 1; ctx.drawImage(T, X, Y); ctx.restore();   // lavis léger de la photo sous les noms : sur fond blanc, le visage reste lisible
+  const fade = (cv, g) => { g.save(); g.globalCompositeOperation = 'destination-in'; const gr = g.createLinearGradient(0, h * 0.84, 0, h); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); g.restore(); };
+  fade(T, t); const W2 = document.createElement('canvas'); W2.width = w; W2.height = h; const w2 = W2.getContext('2d'); w2.drawImage(duo, 0, 0); fade(W2, w2);
+  ctx.globalAlpha = 0.3; ctx.drawImage(W2, X, Y); ctx.globalAlpha = 1; ctx.drawImage(T, X, Y);   // lavis léger de la photo sous les noms : sur la coque blanche, le visage reste lisible
   const e = ENF.enfants.find(x => x.num === kid.num); if (!e) return;
   const cs = 30 * k, label = `${e.prenom} · ${e.pays}`, sub = 'portrait dessiné par les noms des donateurs du cockpit';
-  ctx.font = `800 ${cs}px ${STICK_FONT}`; const lw = ctx.measureText(label).width; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; const sw = ctx.measureText(sub).width, bw = Math.max(lw, sw) + cs * 1.2, bh = cs * 2.2;
-  ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.beginPath(); ctx.roundRect(X + cs * 0.5, Y + cs * 0.5, bw, bh, cs * 0.4); ctx.fill(); ctx.strokeStyle = 'rgba(19,41,75,.15)'; ctx.lineWidth = 2 * k; ctx.stroke();
-  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = kid.acc; ctx.font = `800 ${cs}px ${STICK_FONT}`; ctx.fillText(label, X + cs * 1.1, Y + cs * 1.55);
-  ctx.fillStyle = '#5b6573'; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; ctx.fillText(sub, X + cs * 1.1, Y + cs * 2.25);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = kid.acc; ctx.font = `800 ${cs}px ${STICK_FONT}`; ctx.fillText(label, X + cs * 0.6, Y + cs * 1.4);
+  ctx.fillStyle = '#5b6573'; ctx.font = `500 ${cs * 0.62}px ${STICK_FONT}`; ctx.fillText(sub, X + cs * 0.6, Y + cs * 2.1);
 }
 function drawLogos() {                         // cloison avant : bandeau, Mécénat Chirurgie Cardiaque, Initiatives-Cœur, partenaires
   const ctx = lgCanvas.getContext('2d'), W = lgCanvas.width, H = lgCanvas.height, k = W / 2048, hp = H * 0.17, g = 22 * k;
-  ctx.fillStyle = '#f7f6f2'; ctx.fillRect(0, 0, W, H); drawCkHead(ctx, W, hp);
+  ctx.clearRect(0, 0, W, H); drawCkHead(ctx, W, hp);
   const card = (x, y, cw, ch, title, sub, main) => {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 18 * k); ctx.fill();
     ctx.setLineDash([16 * k, 10 * k]); ctx.lineWidth = 4 * k; ctx.strokeStyle = main ? 'rgba(206,17,30,.75)' : 'rgba(19,41,75,.32)'; ctx.stroke(); ctx.setLineDash([]);
@@ -656,7 +653,7 @@ function typoLogos(ctx, X, Y, w, h, k) {
 let ckSel = -1;
 function drawCk() {
   const ctx = ckCanvas.getContext('2d'), W = ckCanvas.width, H = ckCanvas.height, hp = ckHeadPx(), k = W / CKR[0];
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
   TYPO_KIDS.forEach((kid, s) => drawPortrait(ctx, kid, s, k)); drawLogos();
   if (pickMode && DS.zone === 'ck') {                      // choix d'une place : les cases libres en vert, la place choisie en rouge
     for (let c = 0; c < CKC.length; c++) {
