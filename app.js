@@ -2611,7 +2611,7 @@ function renderLanding() {
   const li = $('lInvite'); if (PAR) { li.innerHTML = `<svg viewBox="0 0 32 30"><path d="M16 29 3 16C-1 12 0 4 7 2c4-1 7 1 9 4 2-3 5-5 9-4 7 2 8 10 4 14Z"/></svg><span><b>${esc(PAR.p)} ${esc(PAR.n)}</b> a mis son nom sur le bateau et t'invite à embarquer.</span>`; li.hidden = false; }
 }
 function showLanding() { closeDlg(); renderLanding(); setView('landing'); landingSpin = true; spotSlot = -1; $('spot').classList.remove('show'); $('alti').classList.remove('armed'); dirty = true; introLoop(); }
-function leaveLanding(to) { const IV = $('introVid'); if (IV && !IV.hidden) { IV.pause(); IV.hidden = true; } landingSpin = false; nav.cy = nav.el = undefined; stopAuto(); token++; spotSlot = -1; spotCk = -1; $('spot').classList.remove('show'); nav.tth = 0; nav.ts = 1.3; nav.td = D0; setView('home');
+function leaveLanding(to) { landingSpin = false; nav.cy = nav.el = undefined; stopAuto(); token++; spotSlot = -1; spotCk = -1; $('spot').classList.remove('show'); nav.tth = 0; nav.ts = 1.3; nav.td = D0; setView('home');
   const tk = token; if (to) to(); if (ck.on && token === tk) { nav.s = nav.ts; nav.th = nav.tth; nav.d = nav.td; leaveCockpit(); } }
 // intro : plan large sur le bateau qui navigue, puis un cycle : un nom à bâbord, un nom du portrait bâbord du cockpit,
 // un nom à tribord (en passant par l'arrière du foc), un nom du portrait tribord ; et on recommence avec d'autres noms
@@ -2625,16 +2625,6 @@ async function introLoop() {
   const label = o => `${o.p} ${o.n}${o.v >= 0 ? ' · ' + VILLES[o.v] : ''}`;
   const hold = async () => { await sleep(3400); $('spot').classList.remove('show'); spotSlot = -1; spotCk = -1; dirty = true; return live(); };
   loadPano();
-  // la vidéo d'ouverture (rendue avec le simulateur, data/config.json → video_intro), puis la 3D prend le relais en fondu
-  const IV = $('introVid'), playIntro = async () => {
-    if (!CFG.video_intro || reduce || !IV) return true;
-    if (!IV.getAttribute('src')) { if (CFG.video_intro_image) IV.poster = CFG.video_intro_image; IV.src = isMobile() && CFG.video_intro_m ? CFG.video_intro_m : CFG.video_intro; IV.preload = 'auto'; }
-    IV.hidden = false; IV.classList.remove('out'); IV.currentTime = 0;
-    try { await IV.play(); } catch (e) { IV.hidden = true; return live(); }
-    await new Promise(res => { const t0 = performance.now(); (function w() { if (!live() || IV.ended || IV.currentTime >= (IV.duration || 1e9) - 1.1 || performance.now() - t0 > 60000) return res(); requestAnimationFrame(w); })(); });
-    IV.classList.add('out'); setTimeout(() => { if (IV.classList.contains('out')) { IV.pause(); IV.hidden = true; } }, 1300); return live();
-  };
-  if (!await playIntro()) return;
   nav.cy = 12; nav.el = -0.15;                        // plan large : on vise la coque et les voiles, horizon dans le cadre
   nav.auto = false; nav.s = nav.ts = 12; nav.th = nav.tth = 0.95; nav.d = nav.td = WIDE * 1.25; dirty = true;
   if (!await flyKeys([[0, 12, 0.95, WIDE * 1.25], [4.5, 12, 1.35, WIDE]], my) || !live()) return;
@@ -2671,11 +2661,7 @@ async function introLoop() {
     spotCk = c; $('spotTxt').textContent = label(o); $('spot').classList.add('show'); dirty = true;
     return hold();
   }
-  for (let n = 0; live(); n++) {
-    if (n && n % 2 === 0 && CFG.video_intro) {          // tous les deux tours, la vidéo revient (on ressort du cockpit sous son fondu)
-      if (ck.on) { setCkMode(false); nav.s = nav.ts = 12; nav.th = nav.tth = 0.95; nav.d = nav.td = WIDE; dirty = true; }
-      if (!await playIntro()) return;
-    }
+  while (live()) {
     if (!await mastName(0) || !await ckName(0) || !await mastName(1) || !await ckName(1)) return;
   }
 }

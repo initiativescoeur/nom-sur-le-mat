@@ -39,8 +39,5 @@
   ],
   "part": 0.4,
   "source": "Portraits de personnes fictives générés par IA (Canva, compte d'Initiatives-Cœur), pour la démo"
- },
- "video_intro": "assets/intro.mp4",
- "video_intro_m": "assets/intro-m.mp4",
- "video_intro_image": "assets/intro.jpg"
+ }
 }

@@ -683,8 +683,3 @@ a.dn:hover { color: var(--ciel); }
 .warn { color: #ffb3b8; }
 .sph { margin: 4px 0 8px; }
 .voy-year { margin: 8px 0 0; font-size: 14px; color: var(--brume); }
-
-/* vidéo d'ouverture de l'accueil (rendue avec le simulateur), au-dessus de la 3D, en fondu */
-.introvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 1; transition: opacity 1.2s ease; background: #071629; }
-.introvid.out { opacity: 0; }
-.introvid[hidden] { display: none; }
