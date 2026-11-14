@@ -18,5 +18,29 @@
  "note_cockpit": "Places du cockpit : plus rares, sous les yeux de Violette pendant toute la course, et souvent visibles dans ses vidéos tournées à bord.",
  "url_publique": "https://initiativescoeur.github.io/nom-sur-le-mat/",
  "hashtags": "#TonNomAutourDuMonde #InitiativesCoeur",
- "video_bienvenue": ""
+ "video_bienvenue": "",
+ "photos_demo": {
+  "dossier": "donateurs/photos/",
+  "femmes": [
+   "portrait-01.jpg",
+   "portrait-03.jpg",
+   "portrait-05.jpg",
+   "portrait-06.jpg",
+   "portrait-09.jpg",
+   "portrait-11.jpg"
+  ],
+  "hommes": [
+   "portrait-02.jpg",
+   "portrait-04.jpg",
+   "portrait-07.jpg",
+   "portrait-08.jpg",
+   "portrait-10.jpg",
+   "portrait-12.jpg"
+  ],
+  "part": 0.4,
+  "source": "Portraits de personnes fictives générés par IA (Canva, compte d'Initiatives-Cœur), pour la démo"
+ },
+ "video_intro": "assets/intro.mp4",
+ "video_intro_m": "assets/intro-m.mp4",
+ "video_intro_image": "assets/intro.jpg"
 }
